@@ -10,8 +10,11 @@ func main() {
 	//Load the configurations for server
 	cfs := config.LoadConfig()
 
-	//Load the Logger 
-	logger.LoadLogger(cfs.Env)
+	// Reconfigure the logger to the desired environment if provided
+	if cfs.Env != "" {
+		logger.LoadLogger(cfs.Env)
+	}
+	defer logger.Log.Sync()
 
 	server.StartServer(cfs)
 }

@@ -1,29 +1,34 @@
 package logger
 
 import (
-	"fmt"
+	"strings"
 
 	"go.uber.org/zap"
 )
 
-// global variable for using the logger function in the whole project
 var Log *zap.Logger
 
-func LoadLogger(env string){
+// to init the global logger
+func LoadLogger(env string) {
 	var err error
-	
-	// checking the environment type
-	if env == "Development"{
+
+	normalized := strings.ToLower(strings.TrimSpace(env))
+
+	// checking the environment (development or production)
+	switch normalized {
+	case "development", "dev":
 		Log, err = zap.NewDevelopment()
-	}else if env == "Production"{
+	case "production", "prod":
 		Log, err = zap.NewProduction()
+	default:
+		// default to development if unknown or empty
+		Log, err = zap.NewDevelopment()
+		normalized = "development"
 	}
 
-	if err != nil{
-		fmt.Println("failed to load Logger", err.Error())
-		return
+	if err != nil {
+		panic("Failed to Initialize Logger: " + err.Error())
 	}
-	defer Log.Sync()
 
-	Log.Info("Logger setup completed successfully! ", zap.String("Environment: ",env))
+	Log.Info("Logger Initialized ", zap.String("Environment", normalized))
 }

@@ -2,11 +2,12 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"os"
 
+	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/modals"
 	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 )
 
 var (
@@ -22,29 +23,26 @@ func LoadConfig() (*modals.Config) {
 	// first load the config 
 	err := godotenv.Load()
 	if err != nil{
-		// add logger error message
-		fmt.Println("ERROR (Could not load environment variables): ", err.Error())
+		logger.Log.Error("Failed to load env",zap.Error(err))
 		return cfs
 	}
-	// add logger success message
+	logger.Log.Debug("Successfully loaded env")
 
 	//load port
 	port := os.Getenv("PORT")
 	if port == ""{
-		//add logger error message
-		fmt.Println("Failed to load Port: ", errfailedToLoadPORT)
+		logger.Log.Error("Failed to fetch port",zap.Error(err))
 		return cfs
 	}
-	//add logger sucess message
+	logger.Log.Debug("Port Loaded", zap.Any("port->",port))
 
 	//load environment type
 	env := os.Getenv("ENV")
 	if env == "" {
-		//add logger error message
-		fmt.Println("Failed to load ENV",errfailedToLoadPORT)
+		logger.Log.Error("Failed to fetch port",zap.Error(err))
 		return cfs
 	}
-	//add logger success message
+	logger.Log.Debug("Environment Loaded", zap.Any("env->",env))
 
 	return &modals.Config{
 		Port: port,

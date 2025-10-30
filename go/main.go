@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/SharveshRamchandani/aieduthon.git/internal/config"
+	"github.com/SharveshRamchandani/aieduthon.git/internal/db"
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/server"
 )
@@ -16,5 +17,9 @@ func main() {
 	}
 	defer logger.Log.Sync()
 
+	//Establishing connection with DB
+	db.ConnectDatabase()
+
+	//Starting server 
 	server.StartServer(cfs)
 }

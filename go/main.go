@@ -4,6 +4,7 @@ import (
 	"github.com/SharveshRamchandani/aieduthon.git/internal/config"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/db"
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
+	"github.com/SharveshRamchandani/aieduthon.git/internal/migrations"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/server"
 )
 
@@ -19,6 +20,8 @@ func main() {
 
 	//Establishing connection with DB
 	db.ConnectDatabase()
+
+	migrations.RunMigrations()
 
 	//Starting server 
 	server.StartServer(cfs)

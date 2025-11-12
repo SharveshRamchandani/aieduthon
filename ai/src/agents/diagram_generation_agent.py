@@ -14,7 +14,6 @@ try:
     GRAPHVIZ_AVAILABLE = True
 except ImportError:
     GRAPHVIZ_AVAILABLE = False
-    logging.warning("Graphviz not available. Install with: pip install graphviz")
 
 try:
     import matplotlib
@@ -23,10 +22,10 @@ try:
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
-    logging.warning("Matplotlib not available. Install with: pip install matplotlib")
 
 from ai_db import get_ai_db
-from agents.text_generation_agent import TextGenerationAgent
+# Lazy import to avoid circular dependency
+TextGenerationAgent = None
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +37,19 @@ class DiagramGenerationAgent:
         self.db = get_ai_db()
         self.diagrams_collection = self.db["diagrams"]
         self.media_collection = self.db["media"]
-        self.text_agent = TextGenerationAgent()
+        self.text_agent = None  # Lazy load to avoid circular import
         self.output_dir = Path("out/generated_diagrams")
         self.output_dir.mkdir(parents=True, exist_ok=True)
+    
+    def _get_text_agent(self):
+        """Lazy load text agent to avoid circular import"""
+        global TextGenerationAgent
+        if TextGenerationAgent is None:
+            from agents.text_generation_agent import TextGenerationAgent as TA
+            TextGenerationAgent = TA
+        if self.text_agent is None:
+            self.text_agent = TextGenerationAgent()
+        return self.text_agent
     
     def generate(self,
                  diagram_type: str,
@@ -315,7 +324,9 @@ class DiagramGenerationAgent:
     
     def _llm_structure_flowchart(self, description: str) -> Dict[str, Any]:
         """Use LLM to structure flowchart data"""
-        prompt = f"""Convert this description into a flowchart structure:
+        try:
+            text_agent = self._get_text_agent()
+            prompt = f"""Convert this description into a flowchart structure:
 {description}
 
 Return JSON:
@@ -325,17 +336,20 @@ Return JSON:
     "edges": [{{"from": "start", "to": "step1", "label": ""}}]
   }}
 }}"""
-        
-        result = self.text_agent.generate(prompt, max_length=512)
-        if result["success"]:
-            try:
-                import json
-                import re
-                json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group())
-            except Exception:
-                pass
+            
+            result = text_agent.generate(prompt, max_length=512)
+            if result.get("success"):
+                try:
+                    import json
+                    import re
+                    json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
+                    if json_match:
+                        return json.loads(json_match.group())
+                except Exception:
+                    pass
+        except Exception:
+            # If LLM fails, use fallback
+            pass
         
         # Fallback structure
         return {

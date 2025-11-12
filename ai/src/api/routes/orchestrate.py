@@ -2,10 +2,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 
-from ...agents.prompt_to_slide_agent import PromptToSlideAgent
-from ...agents.speaker_notes_agent import SpeakerNotesAgent
-from ...agents.quiz_generation_agent import QuizGenerationAgent
-from ...agents.media_integration_agent import MediaIntegrationAgent
+from agents.prompt_to_slide_agent import PromptToSlideAgent
+from agents.speaker_notes_agent import SpeakerNotesAgent
+from agents.quiz_generation_agent import QuizGenerationAgent
+from agents.media_integration_agent import MediaIntegrationAgent
 
 
 class OrchestrateRequest(BaseModel):
@@ -65,9 +65,16 @@ def orchestrate(body: OrchestrateRequest):
 	if body.generate_images or body.generate_diagrams:
 		try:
 			media_agent = MediaIntegrationAgent()
+			media_context = dict(body.context or {})
+			text_session_id = slides_result.get("metadata", {}).get("text_session_id")
+			if text_session_id:
+				media_context["text_session_id"] = text_session_id
+			slide_deck = slides_result.get("slide_deck") or {}
+			if slide_deck.get("image_markers"):
+				media_context["image_markers"] = slide_deck["image_markers"]
 			media_result = media_agent.generate_media_for_deck(
 				deck_id=deck_id,
-				context=body.context or {},
+				context=media_context,
 				generate_images=body.generate_images,
 				generate_diagrams=body.generate_diagrams
 			)

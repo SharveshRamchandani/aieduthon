@@ -4,19 +4,54 @@ for plug-and-play multimodal AI pipeline.
 """
 
 import yaml
-import torch
+import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
-from transformers import (
-    AutoTokenizer, 
-    AutoModelForCausalLM,
-    BitsAndBytesConfig
-)
-from diffusers import StableDiffusionPipeline
-from transformers import BlipProcessor, BlipForConditionalGeneration
-import logging
 
-from ..config import get_config
+# Lazy imports for AI models - only load when needed
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    torch = None
+
+try:
+    from transformers import (
+        AutoTokenizer, 
+        AutoModelForCausalLM,
+        BitsAndBytesConfig
+    )
+    HAS_TRANSFORMERS = True
+except ImportError:
+    HAS_TRANSFORMERS = False
+    AutoTokenizer = None
+    AutoModelForCausalLM = None
+    BitsAndBytesConfig = None
+
+try:
+    from diffusers import StableDiffusionPipeline
+    HAS_DIFFUSERS = True
+except ImportError:
+    HAS_DIFFUSERS = False
+    StableDiffusionPipeline = None
+
+try:
+    from transformers import BlipProcessor, BlipForConditionalGeneration
+    HAS_VISION = True
+except ImportError:
+    HAS_VISION = False
+    BlipProcessor = None
+    BlipForConditionalGeneration = None
+
+# Import config module (file) - use importlib to avoid directory conflict
+import importlib.util
+from pathlib import Path
+config_file = Path(__file__).parent.parent / "config.py"
+spec = importlib.util.spec_from_file_location("ai_config", config_file)
+ai_config = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ai_config)
+get_config = ai_config.get_config
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +121,12 @@ class ModelManager:
     
     def load_text_model(self, model_name: Optional[str] = None, force_reload: bool = False):
         """Load text generation model with quantization support"""
+        if not HAS_TRANSFORMERS or not HAS_TORCH:
+            raise ImportError(
+                "Transformers and PyTorch are required for text generation. "
+                "Install with: pip install transformers torch"
+            )
+        
         config = self.get_text_model_config()
         model_name = model_name or config["name"]
         cache_key = f"text_{model_name}"
@@ -159,6 +200,12 @@ class ModelManager:
     
     def load_image_model(self, model_name: Optional[str] = None, force_reload: bool = False):
         """Load image generation model"""
+        if not HAS_DIFFUSERS or not HAS_TORCH:
+            raise ImportError(
+                "Diffusers and PyTorch are required for image generation. "
+                "Install with: pip install diffusers torch"
+            )
+        
         config = self.get_image_model_config()
         model_name = model_name or config["name"]
         cache_key = f"image_{model_name}"
@@ -198,6 +245,12 @@ class ModelManager:
     
     def load_vision_model(self, model_name: Optional[str] = None, force_reload: bool = False):
         """Load vision model for captioning/understanding"""
+        if not HAS_VISION or not HAS_TORCH:
+            raise ImportError(
+                "Transformers and PyTorch are required for vision models. "
+                "Install with: pip install transformers torch"
+            )
+        
         vision_config = self.model_registry["models"].get("vision", {})
         model_name = model_name or vision_config.get("active_model", "Salesforce/blip-image-captioning-base")
         cache_key = f"vision_{model_name}"

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-from ...agents.quiz_generation_agent import QuizGenerationAgent
+from agents.quiz_generation_agent import QuizGenerationAgent
 
 
 class GenerateQuizRequest(BaseModel):

@@ -6,10 +6,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 
-from ...agents.text_generation_agent import TextGenerationAgent
-from ...agents.image_generation_agent import ImageGenerationAgent
-from ...agents.diagram_generation_agent import DiagramGenerationAgent
-from ...agents.media_integration_agent import MediaIntegrationAgent
+from agents.text_generation_agent import TextGenerationAgent
+from agents.image_generation_agent import ImageGenerationAgent
+from agents.diagram_generation_agent import DiagramGenerationAgent
+from agents.media_integration_agent import MediaIntegrationAgent
 
 router = APIRouter()
 
@@ -95,7 +95,11 @@ def generate_image(body: GenerateImageRequest):
 			"success": True,
 			"urls": result.get("urls", []),
 			"cached": result.get("cached", False),
-			"model": result.get("model")
+			"model": result.get("model"),
+			"mediaIds": result.get("media_ids", []),
+			"captions": result.get("captions", []),
+			"prompt": result.get("prompt"),
+			"generatedAt": result.get("generated_at")
 		}
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))
@@ -131,7 +135,7 @@ def generate_diagram(body: GenerateDiagramRequest):
 def generate_slides(body: GenerateSlidesRequest):
 	"""Generate complete slides with text, images, and diagrams"""
 	try:
-		from ...agents.prompt_to_slide_agent import PromptToSlideAgent
+		from agents.prompt_to_slide_agent import PromptToSlideAgent
 		
 		# Update context
 		context = body.context or {}
@@ -176,7 +180,8 @@ def generate_media_for_deck(deck_id: str, generate_images: bool = True, generate
 		return {
 			"success": True,
 			"media_refs": result.get("media_refs", []),
-			"diagram_refs": result.get("diagram_refs", [])
+			"diagram_refs": result.get("diagram_refs", []),
+			"media_metadata": result.get("media_metadata", [])
 		}
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=str(e))

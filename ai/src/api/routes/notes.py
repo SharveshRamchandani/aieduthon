@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-from ...agents.speaker_notes_agent import SpeakerNotesAgent
+from agents.speaker_notes_agent import SpeakerNotesAgent
 
 
 class GenerateNotesRequest(BaseModel):

@@ -11,7 +11,7 @@ starlette==0.38.5
 
 # Hugging Face and AI/ML
 transformers==4.36.0
-torch==2.1.0
+torch>=2.0.0
 diffusers==0.24.0
 accelerate==0.25.0
 bitsandbytes==0.41.3

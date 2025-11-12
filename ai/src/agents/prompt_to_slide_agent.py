@@ -6,8 +6,8 @@ Uses LLM for intelligent content generation
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass, asdict
 
 from ai_db import get_ai_db
 from agents.text_generation_agent import TextGenerationAgent
@@ -24,6 +24,7 @@ class SlideContent:
     examples: List[str]
     key_points: List[str]
     estimated_duration: int  # seconds
+    images: List[Dict[str, Any]]
 
 
 @dataclass
@@ -36,6 +37,7 @@ class SlideDeck:
     estimated_duration: int
     difficulty_level: str
     target_audience: str
+    image_markers: List[Dict[str, Any]]
 
 
 class PromptToSlideAgent:
@@ -73,7 +75,7 @@ class PromptToSlideAgent:
             analysis = self._analyze_prompt(prompt_text, context)
             
             # Generate structured content
-            slide_deck = self._generate_structured_content(analysis)
+            slide_deck, generation_result = self._generate_structured_content(analysis)
             
             # Store generated slides
             deck_id = self._store_slide_deck(prompt_id, slide_deck, user_id, context)
@@ -82,9 +84,15 @@ class PromptToSlideAgent:
             generate_media = context.get("generate_media", True) if context else True
             if generate_media:
                 try:
+                    enriched_context = dict(context or {})
+                    if generation_result.get("session_id"):
+                        enriched_context["text_session_id"] = generation_result["session_id"]
+                    if slide_deck.image_markers:
+                        enriched_context["image_markers"] = slide_deck.image_markers
+                    enriched_context.setdefault("auto_caption", True)
                     media_result = self.media_agent.generate_media_for_deck(
                         deck_id=deck_id,
-                        context=context,
+                        context=enriched_context,
                         generate_images=True,
                         generate_diagrams=True
                     )
@@ -105,11 +113,12 @@ class PromptToSlideAgent:
                 "success": True,
                 "deck_id": deck_id,
                 "prompt_id": prompt_id,
-                "slide_deck": slide_deck,
+                "slide_deck": asdict(slide_deck),
                 "metadata": {
                     "generated_at": datetime.utcnow(),
                     "locale": locale,
-                    "total_slides": slide_deck.total_slides
+                    "total_slides": slide_deck.total_slides,
+                    "text_session_id": generation_result.get("session_id")
                 }
             }
             
@@ -238,7 +247,7 @@ Return JSON:
         
         return topics[:5]  # Max 5 topics
     
-    def _generate_structured_content(self, analysis: Dict[str, Any]) -> SlideDeck:
+    def _generate_structured_content(self, analysis: Dict[str, Any]) -> Tuple[SlideDeck, Dict[str, Any]]:
         """Generate structured slide content using LLM"""
         
         subject = analysis["subject"]
@@ -279,7 +288,8 @@ Return JSON:
                     bullets=slide_data.get("bullets", []),
                     examples=slide_data.get("examples", []),
                     key_points=slide_data.get("key_points", []),
-                    estimated_duration=self._estimate_slide_duration(complexity)
+                    estimated_duration=self._estimate_slide_duration(complexity),
+                    images=slide_data.get("images", [])
                 ))
         else:
             # Fallback to template-based generation
@@ -295,10 +305,14 @@ Return JSON:
                     bullets=self._generate_bullets(section, subject, complexity),
                     examples=self._generate_examples(section, subject, audience),
                     key_points=self._generate_key_points(section, subject),
-                    estimated_duration=self._estimate_slide_duration(complexity)
+                    estimated_duration=self._estimate_slide_duration(complexity),
+                    images=[]
                 ))
         
         total_duration = sum(slide.estimated_duration for slide in slides)
+        image_markers = result.get("image_markers", []) if isinstance(result, dict) else []
+        
+        raw_result: Dict[str, Any] = result if isinstance(result, dict) else {}
         
         return SlideDeck(
             title=title,
@@ -307,8 +321,9 @@ Return JSON:
             total_slides=len(slides),
             estimated_duration=total_duration,
             difficulty_level=complexity,
-            target_audience=audience
-        )
+            target_audience=audience,
+            image_markers=image_markers
+        ), raw_result
     
     def _generate_sections(self, subject: str, topics: List[str], slide_count: int) -> List[str]:
         """Generate section titles"""
@@ -375,6 +390,8 @@ Return JSON:
             "bullets": [slide.bullets for slide in slide_deck.slides],
             "examples": [slide.examples for slide in slide_deck.slides],
             "key_points": [slide.key_points for slide in slide_deck.slides],
+            "image_placeholders": [slide.images for slide in slide_deck.slides],
+            "image_markers": slide_deck.image_markers,
             "speaker_notes": [],  # Will be filled by SpeakerNotesAgent
             "style": "default",  # Will be filled by TemplateSelectionAgent
             "media_refs": [],  # Will be filled by MediaIntegrationAgent

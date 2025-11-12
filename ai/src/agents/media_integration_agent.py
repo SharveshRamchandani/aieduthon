@@ -5,6 +5,7 @@ Media Integration Agent: Orchestrates image and diagram generation for slides
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+from collections import defaultdict
 
 from agents.image_generation_agent import ImageGenerationAgent
 from agents.diagram_generation_agent import DiagramGenerationAgent
@@ -43,6 +44,10 @@ class MediaIntegrationAgent:
             Dict with generated media references
         """
         try:
+            context = context or {}
+            auto_caption = context.get("auto_caption", True)
+            session_id = context.get("text_session_id") or context.get("session_id")
+            
             # Get slide deck
             from bson.objectid import ObjectId
             deck = self.slides_collection.find_one({"_id": ObjectId(deck_id)})
@@ -51,24 +56,81 @@ class MediaIntegrationAgent:
             
             sections = deck.get("sections", [])
             bullets = deck.get("bullets", [])
+            image_placeholders = deck.get("image_placeholders", [])
             
             media_refs = []
             diagram_refs = []
+            media_metadata: List[List[Dict[str, Any]]] = []
+            markers_by_index: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
+            for marker in context.get("image_markers", []):
+                index = marker.get("slide_index")
+                if index is None and marker.get("slide_title") in sections:
+                    try:
+                        index = sections.index(marker["slide_title"])
+                    except ValueError:
+                        index = None
+                if index is not None:
+                    try:
+                        markers_by_index[int(index)].append(marker)
+                    except (ValueError, TypeError):
+                        continue
             
             # Generate media for each slide
-            for i, (section, slide_bullets) in enumerate(zip(sections, bullets)):
-                slide_media = []
-                slide_diagrams = []
+            for i in range(len(sections)):
+                section = sections[i]
+                slide_bullets = bullets[i] if i < len(bullets) else []
+                slide_media: List[str] = []
+                slide_diagrams: List[str] = []
+                slide_media_details: List[Dict[str, Any]] = []
                 
                 # Generate image if enabled
                 if generate_images:
-                    image_result = self.image_agent.generate_for_slide(
-                        section,
-                        slide_bullets,
-                        context
-                    )
-                    if image_result.get("success") and image_result.get("urls"):
-                        slide_media.extend(image_result["urls"])
+                    placeholders = image_placeholders[i] if i < len(image_placeholders) else []
+                    marker_payloads: List[Dict[str, Any]] = []
+                    if markers_by_index.get(i):
+                        marker_payloads.extend(markers_by_index[i])
+                    if not marker_payloads:
+                        for placeholder in placeholders:
+                            marker_payload = {
+                                **placeholder,
+                                "slide_index": i,
+                                "slide_title": section
+                            }
+                            marker_payloads.append(marker_payload)
+                    
+                    image_result = None
+                    if marker_payloads:
+                        marker_generation = self.image_agent.generate_from_markers(
+                            markers=marker_payloads,
+                            session_id=session_id,
+                            context=context,
+                            caption=auto_caption
+                        )
+                        image_result = marker_generation
+                        if marker_generation.get("success"):
+                            for item in marker_generation.get("items", []):
+                                url = item.get("url")
+                                if url:
+                                    slide_media.append(url)
+                                    slide_media_details.append(item)
+                        else:
+                            logger.warning(f"Marker-driven image generation failed for slide {i}: {marker_generation.get('errors')}")
+                    
+                    if not slide_media and (image_result is None or not image_result.get("success")):
+                        fallback_result = self.image_agent.generate_for_slide(
+                            section,
+                            slide_bullets,
+                            context
+                        )
+                        if fallback_result.get("success") and fallback_result.get("urls"):
+                            slide_media.extend(fallback_result["urls"])
+                            slide_media_details.append({
+                                "prompt": fallback_result.get("prompt"),
+                                "url": fallback_result["urls"][0],
+                                "media_id": (fallback_result.get("media_ids") or [None])[0],
+                                "caption": (fallback_result.get("captions") or [None])[0],
+                                "source": "fallback"
+                            })
                 
                 # Generate diagram if enabled and appropriate
                 if generate_diagrams and self._should_generate_diagram(section, slide_bullets):
@@ -83,6 +145,7 @@ class MediaIntegrationAgent:
                 
                 media_refs.append(slide_media)
                 diagram_refs.append(slide_diagrams)
+                media_metadata.append(slide_media_details)
             
             # Update deck with media references
             self.slides_collection.update_one(
@@ -91,6 +154,7 @@ class MediaIntegrationAgent:
                     "$set": {
                         "media_refs": media_refs,
                         "diagram_refs": diagram_refs,
+                        "media_metadata": media_metadata,
                         "media_generated_at": datetime.utcnow()
                     }
                 }
@@ -100,7 +164,8 @@ class MediaIntegrationAgent:
                 "success": True,
                 "media_refs": media_refs,
                 "diagram_refs": diagram_refs,
-                "deck_id": deck_id
+                "deck_id": deck_id,
+                "media_metadata": media_metadata
             }
             
         except Exception as e:

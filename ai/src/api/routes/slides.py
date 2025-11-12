@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 
-from ...agents.prompt_to_slide_agent import PromptToSlideAgent
-from ...ai_db import get_ai_db
+from agents.prompt_to_slide_agent import PromptToSlideAgent
+from ai_db import get_ai_db
 from bson.objectid import ObjectId
 
 

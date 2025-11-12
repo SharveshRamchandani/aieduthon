@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ...exporters.ppt_exporter import PPTExporter
+from exporters.ppt_exporter import PPTExporter
 
 
 class ExportRequest(BaseModel):

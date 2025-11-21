@@ -5,6 +5,7 @@ import (
 
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/modals"
+	"github.com/SharveshRamchandani/aieduthon.git/internal/routes"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -15,6 +16,7 @@ func StartServer(cfs *modals.Config){
 	//add router function call
 
 	logger.Log.Info("Starting server ", zap.String("env->",cfs.Env), zap.String("port->",cfs.Port))
+	routes.Routes(router)
 
 	err := router.Run(fmt.Sprintf(":%s",cfs.Port))
 	if err != nil{

@@ -14,7 +14,6 @@ func StartServer(cfs *modals.Config){
 	router := gin.New()
 
 	//add router function call
-
 	logger.Log.Info("Starting server ", zap.String("env->",cfs.Env), zap.String("port->",cfs.Port))
 	routes.Routes(router)
 

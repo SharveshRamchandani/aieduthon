@@ -1,6 +1,10 @@
 package main
 
 import (
+	"log"
+	"os"
+
+	auth "github.com/SharveshRamchandani/aieduthon.git/internal/Auth"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/config"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/db"
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
@@ -18,9 +22,20 @@ func main() {
 	}
 	defer logger.Log.Sync()
 
+	// Get all the credentials required to setup Google Authentication
+	GoogleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+	GoogleSecretKey := os.Getenv("GOOGLE_CLIENT_SECRET")
+	GoogleCallBack := os.Getenv("GOTH_GOOGLE_CALLBACK")
+	if GoogleClientID == "" || GoogleCallBack == "" || GoogleSecretKey == ""{
+		log.Fatalln("Please provide Google Client ID, Secret key, and the call back function")
+		return
+	}
+
+	auth.SetUpgoth(GoogleClientID,GoogleSecretKey,GoogleCallBack)
+	auth.InitStore(os.Getenv("SESSION_KEY"))
+
 	//Establishing connection with DB
 	db.ConnectDatabase()
-
 	migrations.RunMigrations()
 
 	//Starting server 

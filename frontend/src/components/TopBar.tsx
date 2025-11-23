@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, User } from 'lucide-react';
+import { Moon, Sun, LogOut, User, Home, Sparkles } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,27 @@ export const TopBar = () => {
         <div className="text-xl font-bold tracking-tight">SlideGen</div>
         
         <div className="flex items-center gap-4">
+          {user && (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/home')}
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                Home
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/ai-test')}
+                className="flex items-center gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                AI Test
+              </Button>
+            </>
+          )}
+          
           <Button
             variant="ghost"
             size="icon"

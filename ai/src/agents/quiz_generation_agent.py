@@ -1,14 +1,19 @@
 """
 Quiz Generation Agent: Creates interactive quizzes from slide content
+Uses LLM for intelligent question generation
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 from ai_db import get_ai_db
 from bson.objectid import ObjectId
+from agents.text_generation_agent import TextGenerationAgent
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -41,6 +46,7 @@ class QuizGenerationAgent:
 		self.db = get_ai_db()
 		self.slides_collection = self.db["slides"]
 		self.quizzes_collection = self.db["quizzes"]
+		self.text_agent = TextGenerationAgent()
 		
 	def generate_quiz(self, 
 				 deck_id: str, 
@@ -256,10 +262,29 @@ class QuizGenerationAgent:
 		return None
 	
 	def _generate_mcq_question(self, concept: str, topic: str, difficulty: str) -> QuizQuestion:
-		"""Generate multiple choice question"""
-		# In production, use LLM to generate contextual questions
-		question_text = f"Which of the following best describes: {concept}?"
+		"""Generate multiple choice question using LLM"""
+		# Use LLM to generate contextual questions
+		result = self.text_agent.generate_quiz_questions(
+			topic=concept,
+			num_questions=1,
+			question_type="mcq",
+			context={"difficulty": difficulty}
+		)
 		
+		if result.get("success") and result.get("questions"):
+			question_data = result["questions"][0]
+			return QuizQuestion(
+				question_text=question_data.get("question", f"Which of the following best describes: {concept}?"),
+				question_type="mcq",
+				options=question_data.get("options", []),
+				correct_answer=question_data.get("correct_answer", ""),
+				explanation=question_data.get("explanation", ""),
+				difficulty=difficulty,
+				topic=topic
+			)
+		
+		# Fallback
+		question_text = f"Which of the following best describes: {concept}?"
 		options = [
 			f"Option A related to {concept}",
 			f"Option B related to {concept}",
@@ -267,15 +292,12 @@ class QuizGenerationAgent:
 			f"Option D related to {concept}"
 		]
 		
-		correct_answer = options[0]  # In production, generate correct answer
-		explanation = f"This is the correct answer because it accurately represents {concept}."
-		
 		return QuizQuestion(
 			question_text=question_text,
 			question_type="mcq",
 			options=options,
-			correct_answer=correct_answer,
-			explanation=explanation,
+			correct_answer=options[0],
+			explanation=f"This is the correct answer because it accurately represents {concept}.",
 			difficulty=difficulty,
 			topic=topic
 		)

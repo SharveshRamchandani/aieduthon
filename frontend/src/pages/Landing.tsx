@@ -1,15 +1,20 @@
-import { Button } from '@/components/ui/button';
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { MoveRight, PhoneCall } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { TopBar } from '@/components/TopBar';
-import { ArrowRight, Sparkles, Zap, Target } from 'lucide-react';
-import { motion } from 'framer-motion';
-
-
 
 const Landing = () => {
+  const [titleNumber, setTitleNumber] = useState(0);
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  const titles = useMemo(
+    () => ["Students", "Teachers & Educators", "Working Professionals", "Startup Teams & Creator", "Researchers & Academics","Corporate Trainers & Coaches"],
+    []
+  );
 
   const handleGetStarted = () => {
     if (user) {
@@ -19,63 +24,66 @@ const Landing = () => {
     }
   };
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (titleNumber === titles.length - 1) {
+        setTitleNumber(0);
+      } else {
+        setTitleNumber(titleNumber + 1);
+      }
+    }, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [titleNumber, titles]);
+
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden pt-24">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+    <div className="w-full min-h-screen">
       <TopBar />
-      
-      <div className="container mx-auto px-28 py-24 relative z-20">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
-          {/* Left Column - Marketing Copy */}
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
-            className="max-w-xl space-y-6"
-          >
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="text-5xl lg:text-6xl font-bold leading-tight tracking-tight"
-            >
-              Personalized Presentation Generator{" "}
-              <span className="text-primary">for Education</span>
-            </motion.h1>
+      <div className="container mx-auto">
+        <div className="flex gap-8 py-20 lg:py-40 items-center justify-center flex-col">
+          <div>
             
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="text-lg text-muted-foreground leading-relaxed"
-            >
-              Create professional, structured presentations in seconds with AI. 
+          </div>
+          <div className="flex gap-4 flex-col">
+            <h1 className="text-5xl md:text-7xl max-w-6xl tracking-tighter text-center font-regular">
+              <span className="text-primary">Personalized Presentation Generator for</span>
+              <span className="relative flex w-full justify-center overflow-hidden text-center md:pb-4 md:pt-1">
+                &nbsp;
+                {titles.map((title, index) => (
+                  <motion.span
+                    key={index}
+                    className="absolute font-semibold"
+                    initial={{ opacity: 0, y: "-100" }}
+                    transition={{ type: "spring", stiffness: 50 }}
+                    animate={
+                      titleNumber === index
+                        ? {
+                            y: 0,
+                            opacity: 1,
+                          }
+                        : {
+                            y: titleNumber > index ? -150 : 150,
+                            opacity: 0,
+                          }
+                    }
+                  >
+                    {title}
+                  </motion.span>
+                ))}
+              </span>
+            </h1>
+
+            <p className="text-lg md:text-2xl leading-relaxed tracking-tight text-muted-foreground max-w-4xl text-center">
+               Create professional, structured presentations in seconds with AI. 
               Simply describe your topic, and watch as our intelligent system generates 
               beautiful, editable slides tailored for education.
-            </motion.p>
-            
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Button
-                size="lg"
-                onClick={handleGetStarted}
-                data-testid="button-get-started"
-                className="h-12 px-8 text-base rounded-xl font-semibold"
-              >
-                Get Started
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </motion.div>
-          </motion.div>
-
-          {/* Right Column - Feature Showcase */}
-         
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" className="gap-4" onClick={handleGetStarted}>
+              Get Started <MoveRight className="w-4 h-4" />
+            </Button>
         </div>
       </div>
-    </section>
+    </div>
   );
 };
 

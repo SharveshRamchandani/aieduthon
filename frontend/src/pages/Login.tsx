@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SiGoogle } from "react-icons/si";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { TopBar } from '@/components/TopBar';
+
 
 export default function Login() {
   const navigate = useNavigate();
@@ -41,8 +41,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 pt-32">
-      <TopBar />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 ">
+    
       <div className="w-full max-w-md space-y-8">
          
          <div className="bg-card border border-border rounded-2xl p-8 space-y-6"> <div className="text-center">

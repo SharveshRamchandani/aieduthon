@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { TopBar } from '@/components/TopBar';
+
 
 const Signup = () => {
   const [name, setName] = useState('');
@@ -46,8 +46,8 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 pt-32">
-      <TopBar />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 ">
+     
       <div className="w-full max-w-md space-y-8">
        
 

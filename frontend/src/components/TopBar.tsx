@@ -40,7 +40,7 @@ const TopBar = () => {
         
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-8">
-          {["Home", "Editor","Your presentations"].map((item) => (
+          {["Home", "Editor","Presentations"].map((item) => (
             <motion.div
               key={item}
               initial={{ opacity: 0, y: -10 }}

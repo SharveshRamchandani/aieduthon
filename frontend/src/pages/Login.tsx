@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import AuthLayout from "@/components/AuthLayout";
+
 import { SiGoogle } from "react-icons/si";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { TopBar } from '@/components/TopBar';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -40,10 +41,14 @@ export default function Login() {
   };
 
   return (
-    <AuthLayout
-      title="Welcome"
-      subtitle="Access your account and continue your journey with us"
-    >
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 pt-32">
+      <TopBar />
+      <div className="w-full max-w-md space-y-8">
+         
+         <div className="bg-card border border-border rounded-2xl p-8 space-y-6"> <div className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight">Welcome</h2>
+          <p className="text-muted-foreground mt-2">Login to your account</p>
+        </div>
       <form onSubmit={handleLogin} className="space-y-6">
         <div className="space-y-4">
           <div className="space-y-2">
@@ -136,6 +141,8 @@ export default function Login() {
           </button>
         </p>
       </form>
-    </AuthLayout>
+      </div>
+      </div>
+   </div>
   );
 }

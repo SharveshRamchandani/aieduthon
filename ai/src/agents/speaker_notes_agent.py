@@ -1,14 +1,19 @@
 """
 Speaker Notes Agent: Generates detailed speaker notes for presentations
+Uses LLM for intelligent note generation
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
 from ai_db import get_ai_db
 from bson.objectid import ObjectId
+from agents.text_generation_agent import TextGenerationAgent
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -29,6 +34,7 @@ class SpeakerNotesAgent:
 	def __init__(self):
 		self.db = get_ai_db()
 		self.slides_collection = self.db["slides"]
+		self.text_agent = TextGenerationAgent()
 		
 	def generate_speaker_notes(self, 
 						   deck_id: str, 
@@ -145,34 +151,36 @@ class SpeakerNotesAgent:
 		return "general"
 	
 	def _generate_slide_notes(self, section: str, bullets: List[str], context: Dict, slide_index: int) -> SpeakerNote:
-		"""Generate speaker notes for a single slide"""
+		"""Generate speaker notes for a single slide using LLM"""
 		
-		# Generate main points
-		main_points = self._generate_main_points(section, bullets, context)
+		# Use LLM to generate comprehensive speaker notes
+		result = self.text_agent.generate_speaker_notes(
+			slide_title=section,
+			slide_content=bullets,
+			context=context
+		)
 		
-		# Generate talking points
-		talking_points = self._generate_talking_points(section, bullets, context)
+		if result.get("success") and result.get("notes"):
+			notes_data = result["notes"]
+			return SpeakerNote(
+				slide_title=section,
+				main_points=notes_data.get("main_points", []),
+				talking_points=notes_data.get("talking_points", []),
+				examples=notes_data.get("examples", []),
+				transitions=notes_data.get("transitions", []),
+				timing_notes=self._generate_timing_notes(section, bullets, context),
+				audience_engagement=notes_data.get("engagement", [])
+			)
 		
-		# Generate examples
-		examples = self._generate_examples(section, context)
-		
-		# Generate transitions
-		transitions = self._generate_transitions(section, slide_index, context)
-		
-		# Generate timing notes
-		timing_notes = self._generate_timing_notes(section, bullets, context)
-		
-		# Generate audience engagement
-		audience_engagement = self._generate_audience_engagement(section, context)
-		
+		# Fallback to template-based generation
 		return SpeakerNote(
 			slide_title=section,
-			main_points=main_points,
-			talking_points=talking_points,
-			examples=examples,
-			transitions=transitions,
-			timing_notes=timing_notes,
-			audience_engagement=audience_engagement
+			main_points=self._generate_main_points(section, bullets, context),
+			talking_points=self._generate_talking_points(section, bullets, context),
+			examples=self._generate_examples(section, context),
+			transitions=self._generate_transitions(section, slide_index, context),
+			timing_notes=self._generate_timing_notes(section, bullets, context),
+			audience_engagement=self._generate_audience_engagement(section, context)
 		)
 	
 	def _generate_main_points(self, section: str, bullets: List[str], context: Dict) -> List[str]:

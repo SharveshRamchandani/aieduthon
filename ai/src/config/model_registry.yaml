@@ -1,0 +1,113 @@
+# Model Registry Configuration
+# Plug-and-play model selection for multimodal AI pipeline
+
+models:
+  text:
+    active_model: "meta-llama/Llama-2-7b-chat-hf"
+    available_models:
+      - name: "meta-llama/Llama-2-7b-chat-hf"
+        description: "Lightweight, good for cloud/edge, English"
+        quantization: true
+        max_length: 2048
+      - name: "meta-llama/Llama-2-13b-chat-hf"
+        description: "Better reasoning, still affordable"
+        quantization: true
+        max_length: 2048
+      - name: "mistralai/Mistral-7B-Instruct-v0.2"
+        description: "Compact, high-quality"
+        quantization: true
+        max_length: 4096
+      - name: "tiiuae/falcon-7b-instruct"
+        description: "Strong generalist, multilingual friendly"
+        quantization: true
+        max_length: 2048
+    
+    # Quantization settings
+    quantization:
+      enabled: true
+      load_in_8bit: true
+      load_in_4bit: false
+    
+    # Generation settings
+    generation:
+      temperature: 0.7
+      max_new_tokens: 512
+      top_p: 0.9
+      top_k: 50
+      repetition_penalty: 1.1
+
+  image:
+    active_model: "stabilityai/stable-diffusion-2-1"
+    available_models:
+      - name: "stabilityai/stable-diffusion-2-1"
+        description: "Full-featured, widely supported"
+        guidance_scale: 7.5
+        num_inference_steps: 50
+      - name: "runwayml/stable-diffusion-v1-5"
+        description: "Fast, lots of community guides"
+        guidance_scale: 7.5
+        num_inference_steps: 50
+    
+    # Image generation settings
+    generation:
+      width: 1024
+      height: 1024
+      guidance_scale: 7.5
+      num_inference_steps: 50
+      negative_prompt: "blurry, low quality, distorted, text, watermark"
+    
+    # Educational context prompts
+    context_prompts:
+      style: "educational, classroom-appropriate, professional illustration"
+      audience: "students, teachers, educational content"
+      quality: "high quality, detailed, clear, colorful"
+
+  vision:
+    active_model: "Salesforce/blip-image-captioning-base"
+    available_models:
+      - name: "Salesforce/blip-image-captioning-base"
+        description: "Automatic visual captioning, adds context"
+      - name: "naver-clova-ix/donut-base-finetuned-docvqa"
+        description: "Document Q&A extraction"
+
+  diagram:
+    active_tool: "graphviz"
+    available_tools:
+      - name: "graphviz"
+        description: "Flowcharts, process diagrams"
+      - name: "matplotlib"
+        description: "Data visualization, charts"
+      - name: "mermaid"
+        description: "Flowcharts, sequence diagrams"
+    
+    # Diagram generation settings
+    generation:
+      format: "png"
+      dpi: 300
+      style: "educational, clear, colorful"
+
+# Deployment settings
+deployment:
+  device: "auto"  # auto, cpu, cuda
+  offline_mode: false
+  cache_dir: "./models_cache"
+  use_cache: true
+
+# API settings
+api:
+  timeout: 300
+  max_retries: 3
+  batch_size: 1
+
+# Feedback and logging
+feedback:
+  enabled: true
+  store_in_db: true
+  collection: "ai_feedback"
+
+# Caching
+caching:
+  enabled: true
+  ttl: 3600  # seconds
+  collection: "ai_cache"
+

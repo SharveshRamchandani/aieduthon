@@ -3,3 +3,26 @@ python-dotenv==1.0.1
 dnspython==2.6.1
 python-pptx==0.6.23
 Pillow==10.4.0
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+requests==2.32.3
+starlette==0.38.5
+
+# Hugging Face and AI/ML
+transformers==4.36.0
+torch>=2.0.0
+diffusers==0.24.0
+accelerate==0.25.0
+bitsandbytes==0.41.3
+sentencepiece==0.1.99
+
+# Vision models
+transformers[vision]==4.36.0
+
+# Diagram generation
+graphviz==0.20.1
+matplotlib==3.8.2
+
+# Config
+pyyaml==6.0.1

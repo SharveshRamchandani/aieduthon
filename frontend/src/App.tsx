@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Home from "./pages/Home";
 import Editor from "./pages/Editor";
+import AITest from "./pages/AITest";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/signup" element={<Signup />} />
               <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
               <Route path="/editor/:id" element={<ProtectedRoute><Editor /></ProtectedRoute>} />
+              <Route path="/ai-test" element={<ProtectedRoute><AITest /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

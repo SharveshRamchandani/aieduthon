@@ -40,7 +40,7 @@ const TopBar = () => {
         
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-8">
-          {["Home", "Editor","Presentations"].map((item) => (
+          {["Home", "Editor", "Presentations"].map((item) => (
             <motion.div
               key={item}
               initial={{ opacity: 0, y: -10 }}
@@ -49,7 +49,7 @@ const TopBar = () => {
               whileHover={{ scale: 1.05 }}
             >
               <a 
-                href={item === "Home" ? "/home" : item === "Editor" ? "/editor" : item === "Pricing" ? "/#pricing" : "/docs"}
+                href={item === "Home" ? "/home" : item === "Editor" ? "/editor" : item === "Presentations" ? "/presentations" : "/home"}
                 className="text-sm text-foreground hover:text-muted-foreground transition-colors font-medium"
               >
                 {item}

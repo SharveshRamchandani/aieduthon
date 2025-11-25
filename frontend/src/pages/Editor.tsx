@@ -113,9 +113,9 @@ const Editor = () => {
       <TopBar />
       
       <div className="container mx-auto px-4 pt-20 pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Slide Preview */}
-          <div className="space-y-4">
+          <div className="lg:col-span-2 space-y-4 pt-9">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Preview</h2>
               <div className="flex gap-2">
@@ -141,7 +141,7 @@ const Editor = () => {
               </div>
             </div>
 
-            <div className="aspect-video bg-card border-2 border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+            <div className="aspect-video bg-card border-2 border-border rounded-2xl p-8 flex flex-col items-center justify-center text-center">
               <h1 className="text-5xl font-bold mb-6">{currentSlide.title}</h1>
               <p className="text-lg text-muted-foreground max-w-2xl">{currentSlide.content}</p>
             </div>
@@ -163,7 +163,7 @@ const Editor = () => {
           </div>
 
           {/* Editor Panel */}
-          <div className="space-y-6">
+          <div className="lg:col-span-1 space-y-6 pt-9">
             <h2 className="text-2xl font-bold">Edit Slide</h2>
             
             <div className="space-y-4 bg-card border border-border rounded-2xl p-6">

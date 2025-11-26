@@ -41,13 +41,21 @@ func InitStore(key string) {
 //   - We avoid logging secrets — logging the clientId is fine for debugging but never the secret.
 //   - If callback URL is empty we log a warning because the provider may misbehave.
 func SetUpgoth(clientId, secretkey, callbackfunc string) {
+	if clientId == "" {
+		logger.Log.Error("auth: SetUpgoth: error: clientId is empty; provider not registered")
+		return
+	}
+	if secretkey == "" {
+		logger.Log.Error("auth: SetUpgoth: error: secretkey is empty; provider not registered")
+		return
+	}
+	if callbackfunc == "" {
+		logger.Log.Warn("auth: SetUpgoth: warning: callback URL is empty; provider may not work as expected")
+	}
+
 	goth.UseProviders(google.New(clientId, secretkey, callbackfunc, "email", "profile"))
 	logger.Log.Debug("auth: SetUpgoth: info: google provider registered (clientId provided, secret not logged)")
 
 	// Ensure goth's store is wired up from our Store.
-	err := GothicStoreWrapper()
-	if err == ""{
-		logger.Log.Error("auth: GothicStoreWrapper: warning: auth.Store is nil; gothic.Store not set")
-		return
-	}
+	GothicStoreWrapper()
 }

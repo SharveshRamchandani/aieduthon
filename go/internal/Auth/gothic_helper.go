@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
 
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
@@ -8,41 +9,27 @@ import (
 	"github.com/markbates/goth/gothic"
 )
 
-// GothicStoreWrapper sets the gothic package Store to our package-level Store.
-// I wrote this kinda quick so the comment isn't perfect — basically it checks if
-// Store is nil (which I sometimes forget to set) and logs a warning so you can
-// spot the problem when you review later.
-//
-// If Store is nil we don't touch gothic.Store and we log so you don't wonder
-// why auth isn't working later.
-func GothicStoreWrapper()(string) {
+func GothicStoreWrapper() {
 	if Store == nil {
-		return ""
+		logger.Log.Error("auth: GothicStoreWrapper: CRITICAL ERROR: auth.Store is nil; InitStore() must be called BEFORE SetUpgoth()")
+		return
 	}
 
 	gothic.Store = Store
-	logger.Log.Debug("auth: GothicStoreWrapper: info: gothic.Store set from auth.Store")
-	return "pass"
+	logger.Log.Debug("auth: GothicStoreWrapper: info: gothic.Store set from auth.Store successfully")
 }
 
-// GinHandler wraps a standard net/http handler so it can be used as a gin.HandlerFunc.
-// Notes (written in a kinda human-mistake style so it's easy to read later):
-//   - If you accidentally pass nil as fn (I do that sometimes) we don't panic — we log
-//     the mistake and return a 500 so you can find the bug in logs.
-//   - We also recover from panics inside fn and log them, then return 500 to the client.
-//   - This helps during dev so a bad oauth callback doesn't bring the whole server down.
 func GinHandler(fn func(http.ResponseWriter, *http.Request)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if fn == nil {
-			logger.Log.Error("Failed to catch function named fn")
+			logger.Log.Error("auth: GinHandler: error: nil handler function provided; check where this middleware is used")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 
-		// protect against panics in the wrapped handler so the server doesn't crash.
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Log.Error("auth: GinHandler: panic recovered from wrapped handler is nil",)
+				logger.Log.Error("auth: GinHandler: panic recovered from wrapped handler" + fmt.Sprintf("%v",r))
 				c.AbortWithStatus(http.StatusInternalServerError)
 			}
 		}()

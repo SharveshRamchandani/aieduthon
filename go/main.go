@@ -31,8 +31,8 @@ func main() {
 		return
 	}
 
-	auth.SetUpgoth(GoogleClientID,GoogleSecretKey,GoogleCallBack)
 	auth.InitStore(os.Getenv("SESSION_KEY"))
+	auth.SetUpgoth(GoogleClientID,GoogleSecretKey,GoogleCallBack)
 
 	//Establishing connection with DB
 	db.ConnectDatabase()

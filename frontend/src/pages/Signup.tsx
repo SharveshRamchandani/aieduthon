@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
+
 const Signup = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -45,14 +46,17 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 ">
+     
       <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
+       
+
+        <div className="bg-card border border-border rounded-2xl p-8 space-y-6">
+           <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight">Create Account</h2>
           <p className="text-muted-foreground mt-2">Get started with SlideGen</p>
         </div>
-
-        <div className="bg-card border border-border rounded-2xl p-8 space-y-6">
+        <br />
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>

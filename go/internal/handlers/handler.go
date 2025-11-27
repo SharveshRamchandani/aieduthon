@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	auth "github.com/SharveshRamchandani/aieduthon.git/internal/Auth"
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
@@ -53,8 +54,20 @@ func GoogleCallBackFunction(c *gin.Context) {
 		return
 	}
 
+	JwtExp := time.Now().Add(24 * time.Hour).Unix()
+
+	c.SetCookie(
+		"Auth",
+		JwtToken,
+		int(JwtExp),
+		"/",
+		"localhost",
+		false,
+		true,
+	)
+
 	logger.Log.Info("Frontend URL loaded", zap.String("url", frontendURL))
 
-	redirect := fmt.Sprintf("%s/home?token=%s", frontendURL, JwtToken)
+	redirect := fmt.Sprintf("%s/home", frontendURL)
 	c.Redirect(http.StatusSeeOther, redirect)
 }

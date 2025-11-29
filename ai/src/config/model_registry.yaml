@@ -77,6 +77,17 @@ models:
       repetition_penalty: 1.1
 
   image:
+    # Image source: "stock" (default) uses stock image APIs, "generate" uses AI image generation
+    source: "stock"  # Options: "stock", "generate"
+    
+    # Stock image provider settings
+    stock_image:
+      provider: "unsplash"  # Options: "unsplash", "pexels", "pixabay"
+      # API keys should be set in .env file:
+      # UNSPLASH_API_KEY=your_key
+      # PEXELS_API_KEY=your_key
+      # PIXABAY_API_KEY=your_key
+    
     active_model: "stabilityai/stable-diffusion-xl"
     available_models:
       - name: "stabilityai/stable-diffusion-xl"

@@ -18,6 +18,13 @@ class AIConfig:
 	gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
 	gemini_model_id: str = os.getenv("GEMINI_MODEL_ID", "gemma-3-1b-it")
 	stability_api_key: str = os.getenv("STABILITY_API_KEY", "")
+	# Stock image API keys
+	unsplash_api_key: str = os.getenv("UNSPLASH_API_KEY", "")
+	pexels_api_key: str = os.getenv("PEXELS_API_KEY", "")
+	pixabay_api_key: str = os.getenv("PIXABAY_API_KEY", "")
+	stock_image_provider: str = os.getenv("STOCK_IMAGE_PROVIDER", "unsplash")
+	# Image source preference: "stock" (default) or "generate"
+	image_source: str = os.getenv("IMAGE_SOURCE", "stock")
 
 
 def get_config() -> AIConfig:

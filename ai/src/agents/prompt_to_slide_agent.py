@@ -12,6 +12,8 @@ from dataclasses import dataclass, asdict
 from ai_db import get_ai_db
 from agents.text_generation_agent import TextGenerationAgent
 from agents.media_integration_agent import MediaIntegrationAgent
+from agents.template_selection_agent import TemplateSelectionAgent
+from utils.fix_ppt_pipeline import prepare_slides_from_raw
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ class SlideContent:
     key_points: List[str]
     estimated_duration: int  # seconds
     images: List[Dict[str, Any]]
+    notes: str = ""
 
 
 @dataclass
@@ -38,6 +41,7 @@ class SlideDeck:
     difficulty_level: str
     target_audience: str
     image_markers: List[Dict[str, Any]]
+    template_path: Optional[str] = None
 
 
 class PromptToSlideAgent:
@@ -49,6 +53,7 @@ class PromptToSlideAgent:
         self.slides_collection = self.db["slides"]
         self.text_agent = TextGenerationAgent()
         self.media_agent = MediaIntegrationAgent()
+        self.template_agent = TemplateSelectionAgent()
         
     def generate_slides(self, 
                        prompt_text: str, 
@@ -73,9 +78,29 @@ class PromptToSlideAgent:
             
             # Analyze prompt and extract requirements
             analysis = self._analyze_prompt(prompt_text, context)
+
+            # Respect explicit slide count from context if provided
+            user_requested_slides = None
+            if context:
+                user_requested_slides = context.get("estimated_slides")
+                if isinstance(user_requested_slides, str):
+                    try:
+                        user_requested_slides = int(user_requested_slides)
+                    except ValueError:
+                        user_requested_slides = None
+            if isinstance(user_requested_slides, (int, float)):
+                user_requested_slides = int(user_requested_slides)
+                if user_requested_slides > 0:
+                    analysis["estimated_slides"] = max(3, min(30, user_requested_slides))
             
             # Generate structured content
             slide_deck, generation_result = self._generate_structured_content(analysis)
+
+            template_path = self.template_agent.select_template(
+                analysis.get("subject", ""),
+                analysis.get("key_topics", []),
+            )
+            slide_deck.template_path = template_path
             
             # Store generated slides
             deck_id = self._store_slide_deck(prompt_id, slide_deck, user_id, context)
@@ -106,7 +131,8 @@ class PromptToSlideAgent:
             self._emit_analytics_event(user_id, deck_id, "slides_generated", {
                 "total_slides": slide_deck.total_slides,
                 "estimated_duration": slide_deck.estimated_duration,
-                "difficulty_level": slide_deck.difficulty_level
+                "difficulty_level": slide_deck.difficulty_level,
+                "template_path": template_path,
             })
             
             return {
@@ -118,7 +144,9 @@ class PromptToSlideAgent:
                     "generated_at": datetime.utcnow(),
                     "locale": locale,
                     "total_slides": slide_deck.total_slides,
-                    "text_session_id": generation_result.get("session_id")
+                    "text_session_id": generation_result.get("session_id"),
+                    "raw_slide_json": generation_result.get("text"),
+                    "template_path": template_path,
                 }
             }
             
@@ -169,16 +197,17 @@ Return JSON:
 }}"""
         
         result = self.text_agent.generate(analysis_prompt, context, max_length=512)
-        
+
         if result.get("success"):
             try:
                 import re
                 json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
                 if json_match:
                     analysis = json.loads(json_match.group())
-                    # Merge with context
                     if context:
                         analysis["target_audience"] = context.get("grade_level", analysis.get("target_audience", "general"))
+                    analysis.setdefault("estimated_slides", max(5, len(analysis.get("key_topics", [])) or 8))
+                    analysis.setdefault("key_topics", [])
                     return analysis
             except Exception as e:
                 logger.warning(f"Failed to parse LLM analysis: {e}")
@@ -250,10 +279,14 @@ Return JSON:
     def _generate_structured_content(self, analysis: Dict[str, Any]) -> Tuple[SlideDeck, Dict[str, Any]]:
         """Generate structured slide content using LLM"""
         
-        subject = analysis["subject"]
-        complexity = analysis["complexity"]
-        slide_count = analysis["estimated_slides"]
-        topics = analysis["key_topics"]
+        subject = analysis.get("subject", "general")
+        complexity = analysis.get("complexity", "intermediate")
+        try:
+            slide_count = int(analysis.get("estimated_slides") or 8)
+        except (ValueError, TypeError):
+            slide_count = 8
+        slide_count = max(3, min(30, slide_count))
+        topics = analysis.get("key_topics") or []
         audience = analysis["target_audience"]
         
         # Use LLM to generate slide content
@@ -273,24 +306,47 @@ Return JSON:
             context=context
         )
         
-        if result.get("success") and result.get("content"):
-            # Parse LLM-generated content
-            content = result["content"]
-            title = content.get("title", f"{subject.title()} Presentation")
-            slides_data = content.get("slides", [])
+        if result.get("success") and result.get("text"):
+            try:
+                prepared_payload = prepare_slides_from_raw(
+                    result["text"],
+                    desired_slide_count=slide_count
+                )
+                title = prepared_payload.get("meta", {}).get("presentation_title", f"{subject.title()} Presentation")
+                slides_data = prepared_payload.get("slides", [])
+            except Exception as exc:
+                logger.warning(f"Failed to prepare slides from raw JSON: {exc}")
+                slides_data = []
+                title = f"{subject.title()} Presentation"
             
             slides = []
             sections = []
             for slide_data in slides_data:
-                sections.append(slide_data.get("title", ""))
+                section_title = slide_data.get("title", "")
+                sections.append(section_title)
                 slides.append(SlideContent(
-                    title=slide_data.get("title", ""),
+                    title=section_title,
                     bullets=slide_data.get("bullets", []),
                     examples=slide_data.get("examples", []),
                     key_points=slide_data.get("key_points", []),
                     estimated_duration=self._estimate_slide_duration(complexity),
-                    images=slide_data.get("images", [])
+                    images=slide_data.get("images", []),
+                    notes=slide_data.get("notes", "")
                 ))
+            if len(slides) < slide_count:
+                fallback_sections = self._generate_sections(subject, topics, slide_count)
+                for idx in range(len(slides), slide_count):
+                    section = fallback_sections[idx] if idx < len(fallback_sections) else f"Topic {idx + 1}"
+                    sections.append(section)
+                    slides.append(SlideContent(
+                        title=f"{idx + 1}. {section}",
+                        bullets=self._generate_bullets(section, subject, complexity),
+                        examples=self._generate_examples(section, subject, audience),
+                        key_points=self._generate_key_points(section, subject),
+                        estimated_duration=self._estimate_slide_duration(complexity),
+                        images=[],
+                        notes=""
+                    ))
         else:
             # Fallback to template-based generation
             title = f"{subject.title()} Presentation"
@@ -306,7 +362,8 @@ Return JSON:
                     examples=self._generate_examples(section, subject, audience),
                     key_points=self._generate_key_points(section, subject),
                     estimated_duration=self._estimate_slide_duration(complexity),
-                    images=[]
+                    images=[],
+                    notes=""
                 ))
         
         total_duration = sum(slide.estimated_duration for slide in slides)
@@ -392,6 +449,8 @@ Return JSON:
             "key_points": [slide.key_points for slide in slide_deck.slides],
             "image_placeholders": [slide.images for slide in slide_deck.slides],
             "image_markers": slide_deck.image_markers,
+			"template_path": slide_deck.template_path,
+            "generated_notes": [slide.notes for slide in slide_deck.slides],
             "speaker_notes": [],  # Will be filled by SpeakerNotesAgent
             "style": "default",  # Will be filled by TemplateSelectionAgent
             "media_refs": [],  # Will be filled by MediaIntegrationAgent

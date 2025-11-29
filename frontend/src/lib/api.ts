@@ -60,6 +60,7 @@ export interface OrchestrateRequest {
   presentation_style?: string;
   generate_images?: boolean;
   generate_diagrams?: boolean;
+  estimated_slides?: number;
 }
 
 export interface OrchestrateResponse {
@@ -194,7 +195,7 @@ export async function generateMediaForDeck(
 }
 
 // Export Deck to PPTX
-export async function exportDeck(deckId: string, outputDir?: string): Promise<{ filePath: string }> {
+export async function exportDeck(deckId: string, outputDir?: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/slides/${deckId}/export`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -206,7 +207,26 @@ export async function exportDeck(deckId: string, outputDir?: string): Promise<{ 
     throw new Error(error || 'Failed to export deck');
   }
 
-  return response.json();
+  // Get filename from Content-Disposition header or use default
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `deck_${deckId}.pptx`;
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+    if (filenameMatch) {
+      filename = filenameMatch[1];
+    }
+  }
+
+  // Create blob and trigger download
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 }
 
 // Generate Speaker Notes
@@ -216,7 +236,7 @@ export async function generateSpeakerNotes(
   audienceLevel?: string,
   presentationStyle?: string
 ): Promise<{ success: boolean; speaker_notes: any[] }> {
-  const response = await fetch(`${API_BASE_URL}/slides/${deckId}/notes`, {
+  const response = await fetch(`${API_BASE_URL}/slides/${deckId}/speaker-notes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

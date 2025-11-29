@@ -12,11 +12,12 @@ load_dotenv(dotenv_path=AI_ENV_PATH, override=False)
 class AIConfig:
 	ai_mongo_uri: str = os.getenv("AI_MONGODB_URI", "mongodb://localhost:27017")
 	ai_db_name: str = os.getenv("AI_DB_NAME", "ai_db")
-	llm_provider: str = os.getenv("LLM_PROVIDER", "huggingface")
+	llm_provider: str = os.getenv("LLM_PROVIDER", "gemini")
 	hf_api_key: str = os.getenv("HF_API_KEY", "")
-	hf_model_id: str = os.getenv("HF_MODEL_ID", "meta-llama/Llama-3.1-8B-Instruct")
+	hf_model_id: str = os.getenv("HF_MODEL_ID", "mistralai/Mistral-7B-Instruct-v0.2")
 	gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-	gemini_model_id: str = os.getenv("GEMINI_MODEL_ID", "gemini-1.5-flash")
+	gemini_model_id: str = os.getenv("GEMINI_MODEL_ID", "gemma-3-1b-it")
+	stability_api_key: str = os.getenv("STABILITY_API_KEY", "")
 
 
 def get_config() -> AIConfig:

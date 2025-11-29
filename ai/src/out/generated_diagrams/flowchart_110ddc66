@@ -1,0 +1,11 @@
+// What is Science?: Science is about understanding the world around us. It’s a systematic way of investigating natural phenomena.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label="What is Science?"]
+	step1 [label="Science is about understanding the world around us. It’s a systematic way of investigating natural phenomena."]
+	step1 -> step2 [label="It's a systematic way of investigating natural phenomena."]
+	step1 -> step3 [label="Understanding the world around us."]
+	step1 -> step4 [label="It’s a way of exploring and explaining how things work."]
+}

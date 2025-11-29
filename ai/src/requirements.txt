@@ -26,3 +26,4 @@ matplotlib==3.8.2
 
 # Config
 pyyaml==6.0.1
+jsonschema==4.23.0

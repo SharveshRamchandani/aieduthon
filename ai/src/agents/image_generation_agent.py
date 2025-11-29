@@ -8,9 +8,11 @@ import base64
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
-from PIL import Image
+from PIL import Image, ImageFile
 import hashlib
 import json
+import time
+import requests
 
 from bson import ObjectId
 
@@ -32,6 +34,7 @@ class ImageGenerationAgent:
         self.image_model = None
         self.vision_model = None
         self._ensure_models_loaded()
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
         self.output_dir = Path("out/generated_images")
         self.output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -135,10 +138,15 @@ class ImageGenerationAgent:
                         "error": f"AI models not installed: {str(e)}",
                         "urls": []
                     }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "error": str(e),
+                        "urls": []
+                    }
             
-            # Get pipeline
-            pipe = self.image_model["pipe"]
             gen_config = config.get("generation", {})
+            provider = self.image_model["config"].get("type") or self.image_model["config"].get("provider")
             
             # Generate images
             urls = []
@@ -147,21 +155,49 @@ class ImageGenerationAgent:
             enhanced_metadata = metadata or {}
             
             for i in range(num_images):
-                result = pipe(
-                    enhanced_prompt,
-                    negative_prompt=negative_prompt or gen_config.get("negative_prompt", ""),
-                    width=width,
-                    height=height,
-                    guidance_scale=gen_config.get("guidance_scale", 7.5),
-                    num_inference_steps=gen_config.get("num_inference_steps", 50)
-                )
-                
-                image = result.images[0]
+                if provider == "huggingface":
+                    result = self._generate_via_hf_api(
+                        endpoint=self.image_model["config"]["endpoint"],
+                        prompt=enhanced_prompt,
+                        negative_prompt=negative_prompt or gen_config.get("negative_prompt", ""),
+                        width=width,
+                        height=height,
+                        guidance_scale=gen_config.get("guidance_scale", 7.5),
+                        num_inference_steps=gen_config.get("num_inference_steps", 50)
+                    )
+                    if not result.get("success"):
+                        return result
+                    image = result["image"]
+                elif provider == "stability":
+                    result = self._generate_via_stability_api(
+                        model_id=self.image_model["config"]["model_id"],
+                        prompt=enhanced_prompt,
+                        negative_prompt=negative_prompt or gen_config.get("negative_prompt", ""),
+                        width=width,
+                        height=height
+                    )
+                    if not result.get("success"):
+                        return result
+                    image = result["image"]
+                else:
+                    pipe = self.image_model["pipe"]
+                    diff_result = pipe(
+                        enhanced_prompt,
+                        negative_prompt=negative_prompt or gen_config.get("negative_prompt", ""),
+                        width=width,
+                        height=height,
+                        guidance_scale=gen_config.get("guidance_scale", 7.5),
+                        num_inference_steps=gen_config.get("num_inference_steps", 50)
+                    )
+                    image = diff_result.images[0]
                 
                 # Save image
                 filename = f"{cache_key}_{i}.png"
                 filepath = self.output_dir / filename
                 image.save(filepath)
+
+                # Public URL served by FastAPI static mount at /media
+                public_url = f"http://localhost:8000/media/{filename}"
 
                 caption_text = None
                 if caption:
@@ -207,7 +243,7 @@ class ImageGenerationAgent:
                 
                 media_result = self.media_collection.insert_one(media_doc)
                 media_id = str(media_result.inserted_id)
-                urls.append(str(filepath))
+                urls.append(public_url)
                 media_ids.append(media_id)
 
                 self._log_output(
@@ -311,6 +347,165 @@ class ImageGenerationAgent:
             self.outputs_collection.insert_one(doc)
         except Exception as e:
             logger.warning(f"Failed to log image output: {e}")
+
+    def _generate_via_hf_api(self,
+                              endpoint: str,
+                              prompt: str,
+                              negative_prompt: str,
+                              width: int,
+                              height: int,
+                              guidance_scale: float,
+                              num_inference_steps: int) -> Dict[str, Any]:
+        """Call Hugging Face Inference API for image generation"""
+        hf_api_key = getattr(self.model_manager.config, "hf_api_key", "")
+        if not hf_api_key:
+            return {
+                "success": False,
+                "error": "HF_API_KEY is not set. Add it to ai/.env",
+                "urls": []
+            }
+        
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "negative_prompt": negative_prompt,
+                "width": width,
+                "height": height,
+                "guidance_scale": guidance_scale,
+                "num_inference_steps": num_inference_steps
+            },
+            "options": {
+                "wait_for_model": True,
+                "use_gpu": True
+            }
+        }
+        
+        response = None
+        try:
+            response = requests.post(
+                f"https://router.huggingface.co/hf-inference/model/{endpoint}",
+                headers={
+                    "Authorization": f"Bearer {hf_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json=payload,
+                timeout=300
+            )
+            if response.status_code == 503:
+                # warmup message, try to fetch job status
+                logger.info("HF inference warming up, retrying...")
+                time.sleep(5)
+                return self._generate_via_hf_api(
+                    endpoint,
+                    prompt,
+                    negative_prompt,
+                    width,
+                    height,
+                    guidance_scale,
+                    num_inference_steps
+                )
+            if not response.ok:
+                return {
+                    "success": False,
+                    "error": f"Hugging Face API error: {response.text}",
+                    "urls": []
+                }
+            
+            image_bytes = io.BytesIO(response.content)
+            image = Image.open(image_bytes).convert("RGB")
+            return {
+                "success": True,
+                "image": image
+            }
+        except Exception as e:
+            logger.error(f"HF inference call failed: {e}")
+            return {
+                "success": False,
+                "error": f"Hugging Face API request failed: {str(e)}",
+                "urls": []
+            }
+
+    def _generate_via_stability_api(self,
+                                    model_id: str,
+                                    prompt: str,
+                                    negative_prompt: str,
+                                    width: int,
+                                    height: int) -> Dict[str, Any]:
+        """Call Stability AI text-to-image API (v1)"""
+        stability_key = getattr(self.model_manager.config, "stability_api_key", "")
+        if not stability_key:
+            return {
+                "success": False,
+                "error": "STABILITY_API_KEY is not set. Add it to ai/.env",
+                "urls": []
+            }
+
+        # Stability v1 API uses the model in the path and text_prompts in the body
+        text_prompts = [{"text": prompt}]
+        if negative_prompt:
+            text_prompts.append({"text": negative_prompt, "weight": -1})
+
+        payload = {
+            "text_prompts": text_prompts,
+            "cfg_scale": 7.0,
+            "height": height,
+            "width": width,
+            "samples": 1
+        }
+
+        try:
+            # Example path: /v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image
+            url = f"https://api.stability.ai/v1/generation/{model_id}/text-to-image"
+            response = requests.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {stability_key}",
+                    "Accept": "image/png",
+                    "Content-Type": "application/json"
+                },
+                json=payload,
+                timeout=180
+            )
+
+            if response.status_code != 200:
+                try:
+                    error_payload = response.json()
+                except ValueError:
+                    error_payload = response.text
+                return {
+                    "success": False,
+                    "error": f"Stability API error: {error_payload}",
+                    "urls": []
+                }
+
+            image_bytes = io.BytesIO(response.content)
+            image = Image.open(image_bytes).convert("RGB")
+            return {"success": True, "image": image}
+        except Exception as e:
+            logger.error(f"Stability inference call failed: {e}")
+            return {
+                "success": False,
+                "error": f"Stability API request failed: {str(e)}",
+                "urls": []
+            }
+
+    def _map_aspect_ratio(self, width: int, height: int) -> str:
+        """Map width/height to closest supported aspect ratio string"""
+        supported = {
+            "1:1": 1.0,
+            "3:2": 3 / 2,
+            "2:3": 2 / 3,
+            "4:5": 4 / 5,
+            "5:4": 5 / 4,
+            "16:9": 16 / 9,
+            "9:16": 9 / 16,
+            "21:9": 21 / 9
+        }
+        if height == 0:
+            return "1:1"
+        target = width / height
+        best_ratio = min(supported.items(), key=lambda item: abs(item[1] - target))[0]
+        return best_ratio
     
     def _build_marker_prompt(self,
                              description: str,

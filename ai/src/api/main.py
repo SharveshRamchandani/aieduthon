@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .routes import slides, notes, quizzes, export, orchestrate, generate
 
@@ -22,6 +23,13 @@ def create_app() -> FastAPI:
 	app.include_router(export.router, prefix="/slides", tags=["export"])
 	app.include_router(orchestrate.router, tags=["orchestrate"])
 	app.include_router(generate.router, tags=["generate"])
+
+	# Serve generated images as static files so the frontend can display them
+	app.mount(
+		"/media",
+		StaticFiles(directory="out/generated_images"),
+		name="media",
+	)
 
 	return app
 

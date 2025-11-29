@@ -1,0 +1,11 @@
+// "title": "Slide 1: What is Photosynthesis?",: "bullets": ["Photosynthesis is the process plants use to convert light energy into chemical energy (sugar)."],
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	process [label="\"title\": \"Slide 1: What is Photosynthesis?\",: \"bul"]
+	end [label=End]
+	start -> process
+	process -> end
+}

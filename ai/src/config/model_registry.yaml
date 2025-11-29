@@ -3,48 +3,101 @@
 
 models:
   text:
-    active_model: "meta-llama/Llama-2-7b-chat-hf"
+    active_model: "gemma-3-1b-it"
+    provider: "gemini"  # Use Google Gemini API only
+    use_api: true  # Use API by default
     available_models:
-      - name: "meta-llama/Llama-2-7b-chat-hf"
-        description: "Lightweight, good for cloud/edge, English"
-        quantization: true
-        max_length: 2048
-      - name: "meta-llama/Llama-2-13b-chat-hf"
-        description: "Better reasoning, still affordable"
-        quantization: true
-        max_length: 2048
-      - name: "mistralai/Mistral-7B-Instruct-v0.2"
-        description: "Compact, high-quality"
-        quantization: true
-        max_length: 4096
-      - name: "tiiuae/falcon-7b-instruct"
-        description: "Strong generalist, multilingual friendly"
-        quantization: true
-        max_length: 2048
+      # Primary (fastest, free-tier, safe)
+      - name: "gemma-3-1b-it"
+        description: "Primary - Fastest, free-tier, safe. Best for low-latency, lots of calls, chat replies, slide bullets, short copy"
+        provider: "gemini"
+        api_version: "v1beta"
+        use_api: true
+        max_length: 8192
+      # Secondary (better capability)
+      - name: "gemini-2.5-flash-lite"
+        description: "Secondary - Better capability, stronger multimodal/text quality, more coherent paragraphs, longer answers"
+        provider: "gemini"
+        api_version: "v1"
+        use_api: true
+        max_length: 8192
+      # Reliable high-quality options
+      - name: "gemini-2.0-flash-001"
+        description: "Reliable - Better context handling, longer outputs, good middle-ground"
+        provider: "gemini"
+        api_version: "v1"
+        use_api: true
+        max_length: 8192
+      - name: "gemini-2.0-flash-lite-001"
+        description: "Reliable - Better context handling, longer outputs, good middle-ground (lite version)"
+        provider: "gemini"
+        api_version: "v1"
+        use_api: true
+        max_length: 8192
+      # General/fallback (most-compatible)
+      - name: "gemini-flash-latest"
+        description: "Fallback - Latest stable Flash, most-compatible across environments"
+        provider: "gemini"
+        api_version: "v1beta"
+        use_api: true
+        max_length: 8192
+      - name: "gemini-flash-lite-latest"
+        description: "Fallback - Latest stable Flash Lite, most-compatible across environments"
+        provider: "gemini"
+        api_version: "v1beta"
+        use_api: true
+        max_length: 8192
+      # Alternatives for diversity / larger generation
+      - name: "gemma-3-4b-it"
+        description: "Alternative - Different style/length trade-offs, fine for most use cases"
+        provider: "gemini"
+        api_version: "v1beta"
+        use_api: true
+        max_length: 8192
+      - name: "gemma-3-12b-it"
+        description: "Alternative - Different style/length trade-offs, can be slower but more capable"
+        provider: "gemini"
+        api_version: "v1beta"
+        use_api: true
+        max_length: 8192
     
     # Quantization settings
+    # Note: Quantization requires CUDA. Disable if running on CPU-only systems.
     quantization:
-      enabled: true
-      load_in_8bit: true
+      enabled: false
+      load_in_8bit: false
       load_in_4bit: false
     
     # Generation settings
     generation:
       temperature: 0.7
-      max_new_tokens: 512
+      max_new_tokens: 2048  # Increased for longer responses
       top_p: 0.9
       top_k: 50
       repetition_penalty: 1.1
 
   image:
-    active_model: "stabilityai/stable-diffusion-2-1"
+    active_model: "stabilityai/stable-diffusion-xl"
     available_models:
-      - name: "stabilityai/stable-diffusion-2-1"
-        description: "Full-featured, widely supported"
+      - name: "stabilityai/stable-diffusion-xl"
+        description: "Stability AI hosted SDXL (API)"
+        provider: "stability"
+        model_id: "stable-diffusion-xl-1024-v1-0"
         guidance_scale: 7.5
         num_inference_steps: 50
+        width: 1024
+        height: 1024
+      - name: "stabilityai/stable-diffusion-2-1"
+        description: "Hugging Face inference API"
+        provider: "huggingface"
+        api_model: "stabilityai/stable-diffusion-2-1"
+        guidance_scale: 7.5
+        num_inference_steps: 50
+        width: 1024
+        height: 1024
       - name: "runwayml/stable-diffusion-v1-5"
-        description: "Fast, lots of community guides"
+        description: "Fallback local diffusers model"
+        pipeline: "sd15"
         guidance_scale: 7.5
         num_inference_steps: 50
     

@@ -1,0 +1,17 @@
+// Evolution and Ecology: Evolution: Change over time. Natural Selection: Survival of the fittest.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1: Introduction to Evolution and Ecology"]
+	step2 [label="Step 2: Natural Selection – The Core Concept"]
+	step3 [label="Step 3: Survival of the Fittest – How it Works"]
+	step4 [label="Step 4: Evolutionary Change – The Process"]
+	step5 [label="Step 5: Ecological Interactions – How Evolution Shapes Environments"]
+	step1 -> step2 [label="Introduces the concepts of Evolution and Ecology."]
+	step2 -> step3 [label="Explains Natural Selection as a mechanism for change."]
+	step3 -> step4 [label="Describes the process of evolutionary change over time."]
+	step4 -> step5 [label="Demonstrates how evolution influences ecological interactions."]
+	step1 -> step5 [label="Links evolution to broader ecological contexts."]
+}

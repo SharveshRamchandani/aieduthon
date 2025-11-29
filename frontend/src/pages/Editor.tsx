@@ -142,10 +142,10 @@ const Editor = () => {
 
     setIsExporting(true);
     try {
-      const result = await exportDeck(id);
+      await exportDeck(id);
       toast({
         title: 'Success',
-        description: `Presentation exported to ${result.filePath}`,
+        description: 'Presentation downloaded successfully!',
       });
     } catch (err) {
       toast({
@@ -317,9 +317,6 @@ const Editor = () => {
               </div>
             </div>
 
-            <div className="aspect-video bg-card border-2 border-border rounded-2xl p-8 flex flex-col items-center justify-center text-center">
-              <h1 className="text-5xl font-bold mb-6">{currentSlide.title}</h1>
-              <p className="text-lg text-muted-foreground max-w-2xl">{currentSlide.content}</p>
             <div className="aspect-video bg-card border-2 border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center relative overflow-hidden">
               <h1 className="text-5xl font-bold mb-6 z-10">{currentSlide.title}</h1>
               <p className="text-lg text-muted-foreground max-w-2xl z-10 whitespace-pre-line">{currentSlide.content}</p>

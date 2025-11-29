@@ -19,6 +19,7 @@ const Home = () => {
   const [gradeLevel, setGradeLevel] = useState('');
   const [subject, setSubject] = useState('');
   const [locale, setLocale] = useState('en');
+  const [estimatedSlides, setEstimatedSlides] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -37,6 +38,12 @@ const Home = () => {
       const context: Record<string, any> = {};
       if (gradeLevel) context.grade_level = gradeLevel;
       if (subject) context.subject = subject;
+      if (estimatedSlides) {
+        const parsed = parseInt(estimatedSlides, 10);
+        if (!Number.isNaN(parsed)) {
+          context.estimated_slides = parsed;
+        }
+      }
       if (generateImages || generateDiagrams) context.generate_media = true;
 
       const data = await orchestrate({
@@ -46,6 +53,7 @@ const Home = () => {
         context,
         generate_images: generateImages,
         generate_diagrams: generateDiagrams,
+        estimated_slides: context.estimated_slides,
       });
 
       setIsGenerating(false);
@@ -115,6 +123,21 @@ const Home = () => {
                     onChange={(e) => setSubject(e.target.value)}
                     disabled={isGenerating}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Estimated Slides</Label>
+                  <Input
+                    type="number"
+                    min={3}
+                    max={30}
+                    placeholder="e.g., 10"
+                    value={estimatedSlides}
+                    onChange={(e) => setEstimatedSlides(e.target.value)}
+                    disabled={isGenerating}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Request between 3–30 slides (defaults to AI estimate if empty)
+                  </p>
                 </div>
               </div>
 

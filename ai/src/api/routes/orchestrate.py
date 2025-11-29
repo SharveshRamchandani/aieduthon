@@ -1,11 +1,16 @@
+import base64
+from typing import Optional, Dict, Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
 
 from agents.prompt_to_slide_agent import PromptToSlideAgent
 from agents.speaker_notes_agent import SpeakerNotesAgent
 from agents.quiz_generation_agent import QuizGenerationAgent
 from agents.media_integration_agent import MediaIntegrationAgent
+from exporters.ppt_exporter import PPTExporter
+from utils.ppt_checks import check_no_json_tokens, check_bullets_limit
+from utils.fix_ppt_pipeline import build_clean_ppt_from_raw
 
 
 class OrchestrateRequest(BaseModel):
@@ -18,6 +23,7 @@ class OrchestrateRequest(BaseModel):
 	presentation_style: str = "educational"
 	generate_images: bool = True
 	generate_diagrams: bool = True
+	estimated_slides: Optional[int] = Field(default=None, ge=3, le=30)
 
 
 router = APIRouter()
@@ -25,13 +31,18 @@ router = APIRouter()
 
 @router.post("/orchestrate", status_code=202)
 def orchestrate(body: OrchestrateRequest):
+	# Merge context with user-provided slide estimate
+	merged_context = dict(body.context or {})
+	if body.estimated_slides is not None:
+		merged_context["estimated_slides"] = body.estimated_slides
+
 	# 1) Slides
 	slides_agent = PromptToSlideAgent()
 	slides_result = slides_agent.generate_slides(
 		prompt_text=body.prompt,
 		user_id=body.userId,
 		locale=body.locale,
-		context=body.context or {},
+		context=merged_context,
 	)
 	if not slides_result.get("success"):
 		raise HTTPException(status_code=500, detail=slides_result.get("error", "Slide generation failed"))
@@ -82,11 +93,37 @@ def orchestrate(body: OrchestrateRequest):
 			# Media generation is optional, don't fail the entire request
 			pass
 
+	# 5) Export PPT as bytes via robust pipeline and run validation checks
+	ppt_bytes = None
+	ppt_filename = None
+	ppt_checks = {"json_tokens": [], "bullet_overflow": []}
+	raw_slide_json = slides_result.get("metadata", {}).get("raw_slide_json")
+	template_path = slides_result.get("slide_deck", {}).get("template_path") or slides_result.get("metadata", {}).get("template_path")
+	try:
+		if raw_slide_json:
+			ppt_bytes, ppt_filename = build_clean_ppt_from_raw(
+				raw_slide_json,
+				deck_title=slides_result.get("slide_deck", {}).get("title"),
+				template_path=template_path
+			)
+		if not ppt_bytes:
+			exporter = PPTExporter()
+			ppt_bytes, ppt_filename = exporter.export_deck_to_bytes(deck_id)
+		ppt_checks["json_tokens"] = check_no_json_tokens(ppt_bytes)
+		ppt_checks["bullet_overflow"] = check_bullets_limit(ppt_bytes)
+	except Exception:
+		ppt_bytes = None
+		ppt_filename = None
+		ppt_checks = {"json_tokens": ["export_failed"], "bullet_overflow": []}
+
 	return {
 		"deckId": deck_id,
 		"promptId": slides_result.get("prompt_id"),
 		"quizIds": quiz_result.get("quiz_ids", []),
 		"mediaGenerated": media_result.get("success", False) if media_result else False,
+		"pptFile": base64.b64encode(ppt_bytes).decode("utf-8") if ppt_bytes else None,
+		"pptFilename": ppt_filename,
+		"pptValidation": ppt_checks,
 		"message": "Complete multimodal presentation generated successfully"
 	}
 

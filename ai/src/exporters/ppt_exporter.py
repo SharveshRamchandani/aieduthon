@@ -1,11 +1,11 @@
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from bson.objectid import ObjectId
 from pptx import Presentation
 from pptx.util import Inches, Pt
-from pptx.enum.text import PP_ALIGN
 from pptx.dml.color import RGBColor
 
 from ai_db import get_ai_db
@@ -17,10 +17,22 @@ class PPTExporter:
 		self.slides_collection = self.db["slides"]
 
 	def export_deck(self, deck_id: str, output_dir: str = "..\\..\\out") -> str:
-		"""Export a slide deck from Mongo to a PPTX file.
+		"""Export slide deck to disk (legacy behavior)."""
+		prs, fname = self._build_presentation(deck_id)
+		out_dir = Path(output_dir).resolve()
+		out_dir.mkdir(parents=True, exist_ok=True)
+		output_path = out_dir / fname
+		prs.save(str(output_path))
+		return str(output_path)
 
-		Returns the absolute path to the generated PPTX.
-		"""
+	def export_deck_to_bytes(self, deck_id: str) -> Tuple[bytes, str]:
+		"""Return PPTX content as bytes plus suggested filename."""
+		prs, fname = self._build_presentation(deck_id)
+		buffer = BytesIO()
+		prs.save(buffer)
+		return buffer.getvalue(), fname
+
+	def _build_presentation(self, deck_id: str) -> Tuple[Presentation, str]:
 		try:
 			object_id = ObjectId(deck_id)
 		except Exception:
@@ -30,7 +42,11 @@ class PPTExporter:
 		if not deck:
 			raise FileNotFoundError("Slide deck not found")
 
-		prs = Presentation()
+		template_path = deck.get("template_path") or deck.get("metadata", {}).get("template_path")
+		if template_path and Path(template_path).exists():
+			prs = Presentation(template_path)
+		else:
+			prs = Presentation()
 
 		# Title slide
 		title_layout = prs.slide_layouts[0]
@@ -42,6 +58,8 @@ class PPTExporter:
 		sections: List[str] = deck.get("sections", [])
 		bullets: List[List[str]] = deck.get("bullets", [])
 		speaker_notes = deck.get("speaker_notes", [])
+		generated_notes = deck.get("generated_notes", [])
+		image_placeholders = deck.get("image_placeholders", [])
 
 		# Content slides
 		for idx, section in enumerate(sections):
@@ -51,30 +69,45 @@ class PPTExporter:
 
 			text_frame = slide.shapes.placeholders[1].text_frame
 			text_frame.clear()
-			for bullet in (bullets[idx] if idx < len(bullets) else []):
-				p = text_frame.add_paragraph()
+			slide_bullets = bullets[idx] if idx < len(bullets) else []
+			for i, bullet in enumerate(slide_bullets):
+				p = text_frame.paragraphs[0] if i == 0 else text_frame.add_paragraph()
 				p.text = bullet
 				p.font.size = Pt(18)
 				p.level = 0
 
-			# Optional speaker notes into a small textbox
-			if idx < len(speaker_notes) and speaker_notes[idx].get("main_points"):
-				left = Inches(0.5)
-				top = Inches(5.5)
-				width = Inches(9)
-				height = Inches(1)
-				shape = slide.shapes.add_textbox(left, top, width, height)
-				frame = shape.text_frame
-				frame.word_wrap = True
-				p = frame.paragraphs[0]
-				p.text = "Notes: " + "; ".join(speaker_notes[idx]["main_points"][:3])
+			# Image placeholder captions
+			placeholders = image_placeholders[idx] if idx < len(image_placeholders) else []
+			for placeholder in placeholders:
+				caption = placeholder.get("caption") or placeholder.get("marker") or placeholder.get("id")
+				if not caption:
+					continue
+				p = text_frame.add_paragraph()
+				p.text = f"[Image placeholder] {caption}"
 				p.font.size = Pt(12)
-				p.font.color.rgb = RGBColor(80, 80, 80)
+				p.font.italic = True
+				p.level = 1
+				p.font.color.rgb = RGBColor(120, 120, 120)
 
-		# Save file
-		out_dir = Path(output_dir).resolve()
-		out_dir.mkdir(parents=True, exist_ok=True)
-		fname = f"deck_{str(object_id)}.pptx"
-		output_path = out_dir / fname
-		prs.save(str(output_path))
-		return str(output_path)
+			# Speaker notes priority
+			notes_text = ""
+			if idx < len(speaker_notes):
+				note_entry = speaker_notes[idx]
+				main_points = note_entry.get("main_points") or []
+				talking_points = note_entry.get("talking_points") or []
+				if main_points or talking_points:
+					chunks = []
+					if main_points:
+						chunks.append("Main points: " + "; ".join(main_points[:4]))
+					if talking_points:
+						chunks.append("Talking points: " + "; ".join(talking_points[:4]))
+					notes_text = "\n".join(chunks)
+			if not notes_text and idx < len(generated_notes):
+				notes_text = generated_notes[idx] or ""
+
+			if notes_text:
+				notes_frame = slide.notes_slide.notes_text_frame
+				notes_frame.clear()
+				notes_frame.text = notes_text.strip()
+
+		return prs, f"deck_{str(object_id)}.pptx"

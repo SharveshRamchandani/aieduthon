@@ -478,6 +478,7 @@ const Editor = () => {
         </div>
       </div>
     </div>
+    </div>
   );
 };
 

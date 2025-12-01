@@ -3,8 +3,11 @@ package server
 import (
 	"fmt"
 
+	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/modals"
+	"github.com/SharveshRamchandani/aieduthon.git/internal/routes"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 func StartServer(cfs *modals.Config){
@@ -12,12 +15,13 @@ func StartServer(cfs *modals.Config){
 
 	//add router function call
 
-	//add logger success message
+	logger.Log.Info("Starting server ", zap.String("env->",cfs.Env), zap.String("port->",cfs.Port))
+	routes.Routes(router)
 
 	err := router.Run(fmt.Sprintf(":%s",cfs.Port))
 	if err != nil{
-		//add logger error meassage
-		fmt.Printf("failed to start server at port: %s",cfs.Port)
+		logger.Log.Error("failed to start the server", zap.String("error", err.Error()))
 		return
 	}
+	logger.Log.Info("Server Started successfully at",zap.String("env->",cfs.Env), zap.String("port->",cfs.Port))
 }

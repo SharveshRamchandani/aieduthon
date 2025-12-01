@@ -22,29 +22,26 @@ func LoadConfig() (*modals.Config) {
 	// first load the config 
 	err := godotenv.Load()
 	if err != nil{
-		// add logger error message
-		fmt.Println("ERROR (Could not load environment variables): ", err.Error())
+		fmt.Println("Failed to load env", err)
 		return cfs
 	}
-	// add logger success message
+	fmt.Println("Successfully loaded env")
 
 	//load port
 	port := os.Getenv("PORT")
 	if port == ""{
-		//add logger error message
-		fmt.Println("Failed to load Port: ", errfailedToLoadPORT)
+		fmt.Println("Failed to fetch port", errfailedToLoadPORT)
 		return cfs
 	}
-	//add logger sucess message
+	fmt.Println("Port Loaded", port)
 
 	//load environment type
 	env := os.Getenv("ENV")
 	if env == "" {
-		//add logger error message
-		fmt.Println("Failed to load ENV",errfailedToLoadPORT)
+		fmt.Println("Failed to fetch port", errfailedToLoadENV)
 		return cfs
 	}
-	//add logger success message
+	fmt.Println("Environment Loaded", env)
 
 	return &modals.Config{
 		Port: port,

@@ -1,4 +1,5 @@
 import logging
+import random
 from pathlib import Path
 from typing import List, Optional
 
@@ -8,7 +9,12 @@ TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "ppt dataset"
 
 
 class TemplateSelectionAgent:
-	"""Chooses a PPT template based on subject/topic keywords."""
+	"""Chooses a PPT template.
+
+	Originally this tried to match by subject/topic keywords. For the current
+	use case we want more visual variety, so we select a random template from
+	the available set on every run.
+	"""
 
 	def __init__(self, template_dir: Optional[Path] = None):
 		self.template_dir = Path(template_dir or TEMPLATE_DIR)
@@ -21,20 +27,8 @@ class TemplateSelectionAgent:
 		return sorted(self.template_dir.glob("*.pptx"))
 
 	def select_template(self, subject: str, topics: List[str]) -> Optional[str]:
+		"""Return a random template path for visual variety."""
 		if not self.templates:
 			return None
-		search_terms = []
-		if subject:
-			search_terms.extend(subject.lower().split())
-		for topic in topics:
-			search_terms.extend(topic.lower().split())
-		if not search_terms:
-			return str(self.templates[0])
-		def score(path: Path) -> int:
-			name = path.stem.lower()
-			return sum(1 for term in search_terms if term and term in name)
-		best = max(self.templates, key=score)
-		if score(best) == 0:
-			return str(self.templates[0])
-		return str(best)
+		return str(random.choice(self.templates))
 

@@ -1,0 +1,9 @@
+// Chlorophyll: The Green Pigment: Chlorophyll captures sunlight. It’s what gives plants their green color.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1 [label="Chlorophyll captures sunlight."]
+}

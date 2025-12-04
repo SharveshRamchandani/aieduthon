@@ -1,0 +1,16 @@
+// The Process: Light-Dependent Reactions: Chlorophyll absorbs sunlight. Water molecules are split.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Chlorophyll absorbs sunlight"]
+	step2 [label="Water molecules are split"]
+	step3 [label="Oxygen is released"]
+	step4 [label="ATP and NADPH are produced"]
+	step5 [label="Energy is captured and used to create sugars"]
+	step1 -> step2 [label="Sunlight absorbed"]
+	step1 -> step3 [label="Oxygen released"]
+	step1 -> step4 [label="ATP and NADPH produced"]
+	step1 -> step5 [label="Energy captured and used for sugar creation"]
+}

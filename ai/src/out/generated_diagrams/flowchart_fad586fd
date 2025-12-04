@@ -1,0 +1,9 @@
+// Sugar: The Plant's Food: Glucose is a type of sugar. Provides energy for growth.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1 [label="Glucose is a type of sugar."]
+}

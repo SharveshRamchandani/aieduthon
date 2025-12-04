@@ -50,6 +50,13 @@ _IMAGE_AGENT: Optional[ImageGenerationAgent] = None
 
 
 def _get_image_agent() -> ImageGenerationAgent:
+    """
+    Legacy helper for image generation.
+    
+    NOTE: The main pipeline now prefers stock images via `StockImageAgent`
+    and uses `PPTExporter` for final PPT creation. This helper remains for
+    backwards-compatibility with any direct calls to this module.
+    """
     global _IMAGE_AGENT
     if _IMAGE_AGENT is None:
         _IMAGE_AGENT = ImageGenerationAgent()
@@ -258,17 +265,43 @@ def prepare_slides_from_raw(
     return {"meta": meta, "slides": normalized_slides}
 
 
+def _clear_all_slides(prs: Presentation) -> None:
+    """
+    Remove all existing slides from a Presentation while keeping layouts.
+    
+    Many design templates ship with example slides; if we don't clear them,
+    our generated slides simply get appended *after* those samples.  This
+    helper ensures the final deck only contains AI-generated content while
+    still using the template's theme and layouts.
+    """
+    sld_id_lst = prs.slides._sldIdLst  # type: ignore[attr-defined]
+    # Remove until empty; indexes shift as we remove.
+    for _ in range(len(prs.slides)):
+        sld_id_lst.remove(sld_id_lst[0])
+
+
 def build_clean_ppt_from_raw(
     raw_text: str,
     deck_title: Optional[str] = None,
     seed_base: int = 1000,
     template_path: Optional[str] = None,
 ) -> Tuple[bytes, str]:
+    """
+    Build a PPT directly from raw LLM JSON.
+
+    The main orchestration pipeline now prefers `PPTExporter`, which works
+    from the stored Mongo slide deck and stock images.  This function is
+    kept for tools / scripts that still call it explicitly.
+    """
     prepared = prepare_slides_from_raw(raw_text)
     slides = prepared["slides"]
     meta = prepared["meta"]
     if template_path and Path(template_path).exists():
         prs = Presentation(template_path)
+        # Remove any sample slides that ship with the template so our
+        # generated slides start from a clean deck but keep the theme.
+        if len(prs.slides):
+            _clear_all_slides(prs)
     else:
         prs = Presentation()
     title_slide = prs.slides.add_slide(prs.slide_layouts[0])

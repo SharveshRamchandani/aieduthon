@@ -3,6 +3,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import requests
 from bson.objectid import ObjectId
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -48,26 +49,62 @@ class PPTExporter:
 		else:
 			prs = Presentation()
 
-		# Title slide
-		title_layout = prs.slide_layouts[0]
-		slide = prs.slides.add_slide(title_layout)
-		slide.shapes.title.text = deck.get("title", "AI Presentation")
-		subtitle = slide.placeholders[1]
-		subtitle.text = f"Generated on {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+		# Title slide – overwrite the first slide in the template if present,
+		# otherwise add a new one using the title layout.
+		if len(prs.slides):
+			slide = prs.slides[0]
+			title_shape = getattr(slide.shapes, "title", None)
+			if title_shape is not None:
+				title_shape.text = deck.get("title", "AI Presentation")
+			else:
+				# Fallback textbox if template has no explicit title shape
+				box = slide.shapes.add_textbox(Inches(1.0), Inches(0.5), Inches(8.0), Inches(1.5))
+				box.text = deck.get("title", "AI Presentation")
+			try:
+				subtitle = slide.placeholders[1]
+				subtitle.text = f"Generated on {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+			except Exception:
+				# Not all templates have a subtitle placeholder; ignore.
+				pass
+		else:
+			title_layout = prs.slide_layouts[0]
+			slide = prs.slides.add_slide(title_layout)
+			if slide.shapes.title:
+				slide.shapes.title.text = deck.get("title", "AI Presentation")
+			try:
+				subtitle = slide.placeholders[1]
+				subtitle.text = f"Generated on {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+			except Exception:
+				pass
 
 		sections: List[str] = deck.get("sections", [])
 		bullets: List[List[str]] = deck.get("bullets", [])
 		speaker_notes = deck.get("speaker_notes", [])
 		generated_notes = deck.get("generated_notes", [])
 		image_placeholders = deck.get("image_placeholders", [])
+		media_refs = deck.get("media_refs", [])
 
 		# Content slides
 		for idx, section in enumerate(sections):
-			content_layout = prs.slide_layouts[1]  # Title and Content
-			slide = prs.slides.add_slide(content_layout)
-			slide.shapes.title.text = section
+			# Try to reuse an existing template slide if available.
+			target_index = idx + 1  # 0 is title slide
+			if target_index < len(prs.slides):
+				slide = prs.slides[target_index]
+				title_shape = getattr(slide.shapes, "title", None)
+				if title_shape is not None:
+					title_shape.text = section
+			else:
+				content_layout = prs.slide_layouts[1]  # Title and Content
+				slide = prs.slides.add_slide(content_layout)
+				if slide.shapes.title:
+					slide.shapes.title.text = section
 
-			text_frame = slide.shapes.placeholders[1].text_frame
+			# Body text frame – fall back to a textbox if placeholder[1] is missing.
+			try:
+				text_frame = slide.placeholders[1].text_frame
+			except Exception:
+				box = slide.shapes.add_textbox(Inches(1.0), Inches(1.5), Inches(8.0), Inches(4.5))
+				text_frame = box.text_frame
 			text_frame.clear()
 			slide_bullets = bullets[idx] if idx < len(bullets) else []
 			for i, bullet in enumerate(slide_bullets):
@@ -76,7 +113,7 @@ class PPTExporter:
 				p.font.size = Pt(18)
 				p.level = 0
 
-			# Image placeholder captions
+			# Image placeholder captions (fallback text when no media available)
 			placeholders = image_placeholders[idx] if idx < len(image_placeholders) else []
 			for placeholder in placeholders:
 				caption = placeholder.get("caption") or placeholder.get("marker") or placeholder.get("id")
@@ -88,6 +125,35 @@ class PPTExporter:
 				p.font.italic = True
 				p.level = 1
 				p.font.color.rgb = RGBColor(120, 120, 120)
+
+			# Render stock / generated images when available
+			slide_media = media_refs[idx] if idx < len(media_refs) else []
+			if slide_media:
+				# Use the first media URL for now; can be extended later.
+				url = slide_media[0] if isinstance(slide_media[0], str) else None
+				if url:
+					try:
+						response = requests.get(url, timeout=15)
+						response.raise_for_status()
+						img_bytes = response.content
+						# Basic right-side placement; template-specific tuning can be
+						# added later if needed.
+						left = Inches(6.0)
+						top = Inches(2.0)
+						width = Inches(3.0)
+						tmp_path = Path("_ppt_tmp_image.png")
+						tmp_path.write_bytes(img_bytes)
+						try:
+							slide.shapes.add_picture(str(tmp_path), left, top, width=width)
+						finally:
+							try:
+								tmp_path.unlink()
+							except OSError:
+								# Non-fatal if temp cleanup fails.
+								pass
+					except Exception:
+						# If image download or placement fails, continue without blocking export.
+						pass
 
 			# Speaker notes priority
 			notes_text = ""

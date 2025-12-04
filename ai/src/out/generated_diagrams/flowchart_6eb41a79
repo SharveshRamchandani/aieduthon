@@ -1,0 +1,14 @@
+// Importance of Photosynthesis: Provides oxygen for us to breathe. Forms the base of most food chains.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Photosynthesis Explained"]
+	step2 [label="Oxygen Production"]
+	step3 [label="Foundation of Food Chains"]
+	step4 [label="Energy Source"]
+	step1 -> step2 [label="Provides Oxygen"]
+	step1 -> step3 [label="Forms the Base of Most Food Chains"]
+	step1 -> step4 [label="Energy Source"]
+}

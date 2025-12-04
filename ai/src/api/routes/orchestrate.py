@@ -10,7 +10,6 @@ from agents.quiz_generation_agent import QuizGenerationAgent
 from agents.media_integration_agent import MediaIntegrationAgent
 from exporters.ppt_exporter import PPTExporter
 from utils.ppt_checks import check_no_json_tokens, check_bullets_limit
-from utils.fix_ppt_pipeline import build_clean_ppt_from_raw
 
 
 class OrchestrateRequest(BaseModel):
@@ -97,18 +96,12 @@ def orchestrate(body: OrchestrateRequest):
 	ppt_bytes = None
 	ppt_filename = None
 	ppt_checks = {"json_tokens": [], "bullet_overflow": []}
-	raw_slide_json = slides_result.get("metadata", {}).get("raw_slide_json")
 	template_path = slides_result.get("slide_deck", {}).get("template_path") or slides_result.get("metadata", {}).get("template_path")
 	try:
-		if raw_slide_json:
-			ppt_bytes, ppt_filename = build_clean_ppt_from_raw(
-				raw_slide_json,
-				deck_title=slides_result.get("slide_deck", {}).get("title"),
-				template_path=template_path
-			)
-		if not ppt_bytes:
-			exporter = PPTExporter()
-			ppt_bytes, ppt_filename = exporter.export_deck_to_bytes(deck_id)
+		# Prefer the structured deck exporter, which already uses the stored
+		# slide content, speaker notes, quizzes, and media (stock images).
+		exporter = PPTExporter()
+		ppt_bytes, ppt_filename = exporter.export_deck_to_bytes(deck_id)
 		ppt_checks["json_tokens"] = check_no_json_tokens(ppt_bytes)
 		ppt_checks["bullet_overflow"] = check_bullets_limit(ppt_bytes)
 	except Exception:

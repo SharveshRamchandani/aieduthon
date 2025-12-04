@@ -1,0 +1,14 @@
+// The Process: Light-Independent Reactions (Calvin Cycle): Carbon dioxide enters the cycle. ATP and NADPH provide energy.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightyellow shape=ellipse style=filled]
+	edge [color=blue dir=forward]
+	step_0 [label="Step 1"]
+	step_1 [label="Step 2"]
+	step_0 -> step_1
+	step_2 [label="Step 3"]
+	step_1 -> step_2
+	step_3 [label="Step 4"]
+	step_2 -> step_3
+	step_3 -> step_0 [style=dashed]
+}

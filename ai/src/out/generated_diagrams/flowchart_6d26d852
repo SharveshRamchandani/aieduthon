@@ -1,0 +1,9 @@
+// The Process: Chlorophyll's Role: Chlorophyll absorbs sunlight. It’s the pigment that gives plants their green color.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1
+}

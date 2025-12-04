@@ -1100,15 +1100,84 @@ Format as JSON:
         result = self.generate(prompt, context, max_length=512)
         
         if result["success"]:
-            try:
-                import json
-                import re
-                json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
-                if json_match:
-                    content = json.loads(json_match.group())
+            import json
+            import re
+            
+            # Try to extract and parse JSON
+            json_str = None
+            json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
+            if json_match:
+                json_str = json_match.group()
+            
+            # First attempt: direct JSON parsing
+            parsed = False
+            if json_str:
+                try:
+                    content = json.loads(json_str)
                     result["notes"] = content
-            except Exception as e:
-                logger.warning(f"Failed to parse JSON from response: {e}")
+                    parsed = True
+                except json.JSONDecodeError:
+                    pass
+            
+            # Second attempt: clean and retry
+            if not parsed and json_str:
+                try:
+                    # Remove control characters but preserve structure
+                    cleaned = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', ' ', json_str)
+                    # Fix common JSON issues: missing commas, trailing commas
+                    cleaned = re.sub(r',\s*}', '}', cleaned)
+                    cleaned = re.sub(r',\s*]', ']', cleaned)
+                    # Fix unquoted keys (if any)
+                    cleaned = re.sub(r'(\w+):', r'"\1":', cleaned)
+                    content = json.loads(cleaned)
+                    result["notes"] = content
+                    parsed = True
+                except (json.JSONDecodeError, Exception):
+                    pass
+            
+            # Fallback: manual extraction if JSON parsing fails
+            if not parsed:
+                try:
+                    raw_text = result["text"]
+                    
+                    def extract_array(field_name):
+                        # Look for field: [ ... ] pattern
+                        pattern = rf'"{field_name}"\s*:\s*\[(.*?)\]'
+                        matches = re.findall(pattern, raw_text, re.DOTALL)
+                        if not matches:
+                            return []
+                        arr_content = matches[0]
+                        # Extract quoted strings from array
+                        strings = re.findall(r'"((?:[^"\\]|\\.)*)"', arr_content)
+                        # Clean up escaped sequences
+                        cleaned_strings = []
+                        for s in strings:
+                            s = s.replace('\\"', '"')
+                            s = s.replace('\\n', ' ')
+                            s = s.replace('\\t', ' ')
+                            s = s.replace('\\r', ' ')
+                            s = re.sub(r'[\x00-\x1F]', ' ', s)  # Remove any remaining control chars
+                            cleaned_strings.append(s.strip())
+                        return [s for s in cleaned_strings if s]
+                    
+                    result["notes"] = {
+                        "main_points": extract_array("main_points"),
+                        "talking_points": extract_array("talking_points"),
+                        "examples": extract_array("examples"),
+                        "transitions": extract_array("transitions"),
+                        "engagement": extract_array("engagement")
+                    }
+                    logger.info("Used fallback parser for speaker notes")
+                except Exception as fallback_error:
+                    logger.warning(f"All parsing methods failed: {fallback_error}")
+                    # Return empty structure so the code doesn't crash
+                    result["notes"] = {
+                        "main_points": [],
+                        "talking_points": [],
+                        "examples": [],
+                        "transitions": [],
+                        "engagement": []
+                    }
         
         return result
     

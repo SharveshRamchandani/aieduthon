@@ -94,7 +94,7 @@ class PromptToSlideAgent:
                     analysis["estimated_slides"] = max(3, min(30, user_requested_slides))
             
             # Generate structured content
-            slide_deck, generation_result = self._generate_structured_content(analysis)
+            slide_deck, generation_result = self._generate_structured_content(analysis, prompt_text)
 
             template_path = self.template_agent.select_template(
                 analysis.get("subject", ""),
@@ -196,7 +196,9 @@ Return JSON:
   "target_audience": "audience level"
 }}"""
         
-        result = self.text_agent.generate(analysis_prompt, context, max_length=512)
+        # Allow a larger response so the model can return richer analysis
+        # without being truncated at 512 tokens.
+        result = self.text_agent.generate(analysis_prompt, context, max_length=2048)
 
         if result.get("success"):
             try:
@@ -276,8 +278,13 @@ Return JSON:
         
         return topics[:5]  # Max 5 topics
     
-    def _generate_structured_content(self, analysis: Dict[str, Any]) -> Tuple[SlideDeck, Dict[str, Any]]:
-        """Generate structured slide content using LLM"""
+    def _generate_structured_content(self, analysis: Dict[str, Any], original_prompt: str) -> Tuple[SlideDeck, Dict[str, Any]]:
+        """Generate structured slide content using LLM.
+
+        The original teacher prompt is passed through so that the LLM can
+        stay tightly focused on the exact topic (e.g., \"photosynthesis\")
+        instead of drifting to a broad subject category (e.g., \"science\").
+        """
         
         subject = analysis.get("subject", "general")
         complexity = analysis.get("complexity", "intermediate")
@@ -297,8 +304,15 @@ Return JSON:
             "locale": "en"
         }
         
-        # Build topic string
-        topics_str = ", ".join(topics) if topics else subject
+        # Build topic string: anchor on the *original* prompt so slides
+        # follow what the teacher typed (e.g., "photosynthesis") rather
+        # than only a generic subject label.
+        base_topic = original_prompt.strip() or subject
+        extra_topics = ", ".join(topics) if topics else ""
+        if extra_topics and extra_topics.lower() not in base_topic.lower():
+            topics_str = f"{base_topic} — key subtopics: {extra_topics}"
+        else:
+            topics_str = base_topic
         
         result = self.text_agent.generate_slides_content(
             topic=topics_str,

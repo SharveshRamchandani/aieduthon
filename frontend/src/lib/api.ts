@@ -251,6 +251,23 @@ export async function generateSpeakerNotes(
     throw new Error(error || 'Failed to generate speaker notes');
   }
 
+  // Check if response is a PDF file
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/pdf')) {
+    // Handle PDF download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `speaker_notes_${deckId}_${Date.now()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    return { success: true, speaker_notes: [] };
+  }
+
   return response.json();
 }
 

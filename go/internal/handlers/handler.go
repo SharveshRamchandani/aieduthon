@@ -11,6 +11,7 @@ import (
 	auth "github.com/SharveshRamchandani/aieduthon.git/internal/Auth"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/db/get"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/db/post"
+	"github.com/SharveshRamchandani/aieduthon.git/internal/db/update"
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/modals/login"
 	mongodb "github.com/SharveshRamchandani/aieduthon.git/internal/modals/mongoDB"
@@ -143,6 +144,8 @@ func Login(c *gin.Context){
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server error"})
 		return
 	}
+
+	update.UpdateLoginTime(Login)
 
 	JwtExp := time.Now().Add(24 * time.Hour).Unix()
 

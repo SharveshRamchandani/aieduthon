@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 
+	cors "github.com/SharveshRamchandani/aieduthon.git/internal/Cors"
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/modals"
 	"github.com/SharveshRamchandani/aieduthon.git/internal/routes"
@@ -12,6 +13,8 @@ import (
 
 func StartServer(cfs *modals.Config){
 	router := gin.New()
+
+	cors.InitCors(router)
 
 	//add router function call
 	logger.Log.Info("Starting server ", zap.String("env->",cfs.Env), zap.String("port->",cfs.Port))

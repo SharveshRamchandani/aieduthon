@@ -8,6 +8,7 @@ import (
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 )
 
 func JWTMiddleWare() gin.HandlerFunc{
@@ -23,34 +24,36 @@ func JWTMiddleWare() gin.HandlerFunc{
 			}
 		}
 
-		if TokenString == ""{
-			logger.Log.Error("UnAuthorized Jwt Token not found!!")
-			ctx.JSON(http.StatusUnauthorized, gin.H{"Error": "Unauthorized access"})
-			return
-		}
+		if TokenString == "" {
+            logger.Log.Debug("JWT token not found in request (user not authenticated)", 
+                zap.String("path", ctx.Request.URL.Path))
+            ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized access"})
+            return
+        }
 
 		parse, err := jwt.Parse(TokenString, func(t *jwt.Token) (interface{}, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok{
-				return nil, jwt.ErrHashUnavailable
-			}
-			return handlers.JwtKey, nil
-		})
+            if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+                logger.Log.Error("JWT signing method mismatch", zap.String("method", t.Method.Alg()))
+                return nil, jwt.ErrSignatureInvalid
+            }
+            return handlers.JwtKey, nil
+        })
 
-		if err != nil || !parse.Valid{
-			logger.Log.Error("UnAuthorized Jwt Token not found!!")
-			ctx.JSON(http.StatusUnauthorized, gin.H{"Error": "Unauthorized access"})
-			return
-		}
+		if err != nil || !parse.Valid {
+            logger.Log.Error("JWT token validation failed", zap.Error(err))
+            ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized access"})
+            return
+        }
 
 		claims, ok := parse.Claims.(jwt.MapClaims)
-		if !ok{
-			logger.Log.Error("UnAuthorized Jwt Token not found!!")
-			ctx.JSON(http.StatusUnauthorized, gin.H{"Error": "Unauthorized access"})
-			return
-		}
+        if !ok {
+            logger.Log.Error("JWT claims extraction failed")
+            ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized access"})
+            return
+        }
 
-		ctx.Set("claims" , mapFromClaims(claims))
-		ctx.Next()
+        ctx.Set("claims", mapFromClaims(claims))
+        ctx.Next()
 	}
 }
 

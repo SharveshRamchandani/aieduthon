@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { Menu, X, Moon, Sun, LogOut, User, Home, Sparkles } from 'lucide-react';
 import { Menu, X, Moon, Sun, LogOut, User, Home, Sparkles } from "lucide-react"
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,7 +34,6 @@ const TopBar = () => {
             whileHover={{ rotate: 10 }}
             transition={{ duration: 0.3 }}
           >
-          
           </motion.div>
           <span className="text-xl font-bold tracking-tight text-foreground">SlideGen</span>
         </div>
@@ -60,6 +60,35 @@ const TopBar = () => {
 
         {/* Desktop CTA Buttons */}
         <div className="hidden md:flex items-center space-x-4">
+          {user && (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/home')}
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                Home
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/ai-test')}
+                className="flex items-center gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                AI Test
+              </Button>
+            </>
+          )}
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="rounded-full"
+          >
+            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
           <motion.div
             className="flex items-center gap-4"
             initial={{ opacity: 0, x: 20 }}

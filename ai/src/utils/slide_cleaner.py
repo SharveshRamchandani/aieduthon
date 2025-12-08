@@ -18,7 +18,7 @@ SLIDE_SCHEMA: Dict[str, Any] = {
                         "type": "array",
                         "minItems": 1,
                         "maxItems": 6,
-                        "items": {"type": "string", "maxLength": 80},
+                        "items": {"type": "string", "maxLength": 1000},  # Increased for expanded content (50-80 words)
                     },
                     "notes": {"type": "string"},
                     "images": {
@@ -102,13 +102,18 @@ def _sanitize_images(images: List[Dict[str, Any]] | None) -> List[Dict[str, str]
 
 
 def _normalize_bullets(raw_bullets: List[str] | None, fallback_source: str) -> List[str]:
+    """Normalize bullets - DO NOT truncate expanded content (50-80 words per bullet)"""
     bullets: List[str] = []
     if raw_bullets:
         for bullet in raw_bullets:
             text = clean_text(bullet)
             if not text:
                 continue
-            bullets.append(_truncate_words(text))
+            # DO NOT truncate - expanded content should be 50-80 words (500-800 chars)
+            # Only truncate if it's extremely long (safety limit)
+            if len(text) > 2000:  # Safety limit for extremely long text
+                text = text[:2000] + "..."
+            bullets.append(text)
             if len(bullets) == 6:
                 break
     if not bullets:

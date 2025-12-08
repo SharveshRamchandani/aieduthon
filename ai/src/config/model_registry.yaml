@@ -60,6 +60,14 @@ models:
         api_version: "v1beta"
         use_api: true
         max_length: 8192
+      # Local offline models (Ollama)
+      - name: "deepseek-r1:1.5b"
+        description: "Local - DeepSeek-R1 1.5B via Ollama, runs offline, ~1.1GB, good for CPU/low RAM systems"
+        provider: "ollama"
+        use_api: true  # Uses Ollama API (local)
+        ollama_model: "deepseek-r1:1.5b"
+        ollama_base_url: "http://localhost:11434"
+        max_length: 4096
     
     # Quantization settings
     # Note: Quantization requires CUDA. Disable if running on CPU-only systems.

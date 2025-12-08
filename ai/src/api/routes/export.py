@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from pathlib import Path
 import os
@@ -9,6 +9,8 @@ from exporters.ppt_exporter import PPTExporter
 
 class ExportRequest(BaseModel):
 	output_dir: str | None = None
+	format: str = "pptx"  # "pptx" or "pdf"
+	user_name: str = "user"  # User name for filename
 
 
 router = APIRouter()
@@ -19,32 +21,35 @@ def export_deck(deck_id: str, body: ExportRequest):
 	"""Export deck and return file as downloadable response"""
 	try:
 		exporter = PPTExporter()
-		# Default output directory relative to the ai/src directory
-		if not body.output_dir:
-			# Get the ai/src directory (3 levels up from routes/export.py)
-			base_dir = Path(__file__).parent.parent.parent
-			output_dir = str(base_dir / "out")
+		
+		# Export to bytes (supports both PPTX and PDF)
+		file_bytes, filename = exporter.export_deck_to_bytes(
+			deck_id, 
+			save_to_db=(body.format == "pptx"),  # Only save PPTX to DB for now
+			user_name=body.user_name,
+			format_type=body.format
+		)
+		
+		# Determine media type
+		if body.format == "pdf":
+			media_type = "application/pdf"
 		else:
-			output_dir = body.output_dir
+			media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 		
-		path = exporter.export_deck(deck_id, output_dir)
-		
-		# Return file as downloadable
-		file_path = Path(path)
-		if not file_path.exists():
-			raise HTTPException(status_code=404, detail="Generated file not found")
-		
-		# Get filename for download
-		filename = file_path.name
-		
-		return FileResponse(
-			path=str(file_path),
-			media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-			filename=filename,
-			headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+		return Response(
+			content=file_bytes,
+			media_type=media_type,
+			headers={
+				"Content-Disposition": f'attachment; filename="{filename}"',
+				"Content-Length": str(len(file_bytes))
+			}
 		)
 	except FileNotFoundError as e:
 		raise HTTPException(status_code=404, detail=str(e))
+	except RuntimeError as e:
+		raise HTTPException(status_code=500, detail=str(e))
+	except ImportError as e:
+		raise HTTPException(status_code=500, detail=f"PDF conversion failed: {str(e)}")
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
 

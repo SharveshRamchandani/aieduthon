@@ -1,0 +1,13 @@
+// Boolean Logic – Common Use Cases (Continued): Conditional statements execute code based on conditions.
+ Decision-making systems automate processes with logical rules.
+ Error handling manages unexpected situations with logical checks.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1 [label="Conditional Statements Execute Code based on Conditions"]
+	step1 -> decisionmakingsystem [label="Automate Processes with Logical Rules"]
+	decisionmakingsystem -> error_handling [label="Manages Unexpected Situations with Logical Checks"]
+}

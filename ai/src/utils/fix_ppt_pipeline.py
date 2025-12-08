@@ -67,11 +67,15 @@ def extract_json_from_text(text: str) -> Dict[str, Any]:
     text = (text or "").strip()
     if not text:
         raise ValueError("LLM output is empty")
+    
+    # Try direct parse first
     if text.startswith("{"):
         try:
             return json.loads(text)
         except json.JSONDecodeError:
             pass
+    
+    # Try to find and extract JSON with bracket matching
     stack: List[int] = []
     start: Optional[int] = None
     for idx, ch in enumerate(text):
@@ -88,6 +92,60 @@ def extract_json_from_text(text: str) -> Dict[str, Any]:
                         return json.loads(candidate)
                     except json.JSONDecodeError:
                         start = None
+    
+    # If JSON is incomplete/truncated, try to fix it
+    # Find the last complete slide and close the JSON properly
+    if start is not None:
+        # Try to extract what we have and close incomplete structures
+        incomplete_json = text[start:]
+        
+        # Try to find last complete slide
+        last_complete_slide = incomplete_json.rfind('}')
+        if last_complete_slide > 0:
+            # Try to close the slides array and root object
+            try:
+                # Find where slides array might end
+                slides_end = incomplete_json.rfind(']')
+                if slides_end > 0:
+                    # Try to construct valid JSON by closing structures
+                    fixed_json = incomplete_json[:slides_end + 1] + ']}'
+                    try:
+                        return json.loads(fixed_json)
+                    except json.JSONDecodeError:
+                        pass
+                
+                # Try closing at last complete slide
+                fixed_json = incomplete_json[:last_complete_slide + 1] + ']}'
+                try:
+                    return json.loads(fixed_json)
+                except json.JSONDecodeError:
+                    pass
+            except Exception:
+                pass
+        
+        # Last resort: try to extract slides we can find
+        import re
+        slides_matches = list(re.finditer(r'\{\s*"title"\s*:\s*"[^"]*"\s*,\s*"bullets"\s*:\s*\[[^\]]*\]', incomplete_json))
+        if slides_matches:
+            # Build minimal valid JSON from found slides
+            slides_list = []
+            for match in slides_matches:
+                slide_text = match.group(0)
+                # Try to extract title and bullets
+                title_match = re.search(r'"title"\s*:\s*"([^"]*)"', slide_text)
+                bullets_match = re.search(r'"bullets"\s*:\s*\[(.*?)\]', slide_text, re.DOTALL)
+                if title_match:
+                    slide_obj = {"title": title_match.group(1), "bullets": []}
+                    if bullets_match:
+                        # Try to extract bullet strings
+                        bullets_text = bullets_match.group(1)
+                        bullet_matches = re.findall(r'"([^"]*)"', bullets_text)
+                        slide_obj["bullets"] = bullet_matches
+                    slides_list.append(slide_obj)
+            
+            if slides_list:
+                return {"slides": slides_list}
+    
     raise ValueError("Could not recover JSON payload from LLM text")
 
 

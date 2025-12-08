@@ -194,12 +194,16 @@ export async function generateMediaForDeck(
   return response.json();
 }
 
-// Export Deck to PPTX
-export async function exportDeck(deckId: string, outputDir?: string): Promise<void> {
+// Export Deck to PPTX or PDF
+export async function exportDeck(deckId: string, format: 'pptx' | 'pdf' = 'pptx', userName: string = 'user', outputDir?: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/slides/${deckId}/export`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ output_dir: outputDir }),
+    body: JSON.stringify({ 
+      output_dir: outputDir,
+      format: format,
+      user_name: userName
+    }),
   });
 
   if (!response.ok) {
@@ -209,7 +213,7 @@ export async function exportDeck(deckId: string, outputDir?: string): Promise<vo
 
   // Get filename from Content-Disposition header or use default
   const contentDisposition = response.headers.get('Content-Disposition');
-  let filename = `deck_${deckId}.pptx`;
+  let filename = `deck_${deckId}.${format}`;
   if (contentDisposition) {
     const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
     if (filenameMatch) {

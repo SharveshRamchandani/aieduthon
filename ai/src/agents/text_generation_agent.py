@@ -259,11 +259,53 @@ class TextGenerationAgent:
             config_obj = get_config()
             text_config = self.model_manager.get_text_model_config()
             provider = text_config.get("provider", config_obj.llm_provider)
+            use_api = text_config.get("use_api", True)
             
-            # Use Gemini API only
-            if not config_obj.gemini_api_key:
+            # Route to appropriate API based on provider
+            if provider == "ollama":
+                api_result = self._generate_via_ollama_api(
+                    formatted_prompt,
+                    max_length=max_length,
+                    temperature=temperature,
+                    config=text_config
+                )
+            elif provider == "gemini" or provider is None:
+                # Use Gemini API
+                if not config_obj.gemini_api_key:
+                    failure_metadata = {
+                        "error": "GEMINI_API_KEY is not set. Add it to ai/.env file. Get your key from: https://aistudio.google.com/app/apikey",
+                        "cache_key": cache_key,
+                        "duration_ms": (datetime.utcnow() - start_time).total_seconds() * 1000
+                    }
+                    self._finalize_session(
+                        session_id,
+                        status="failed",
+                        success=False,
+                        metadata=failure_metadata
+                    )
+                    return {
+                        "success": False,
+                        "error": "GEMINI_API_KEY is not set. Add it to ai/.env file. Get your key from: https://aistudio.google.com/app/apikey",
+                        "text": ""
+                    }
+                
+                api_result = self._generate_via_gemini_api(
+                    formatted_prompt,
+                    max_length=max_length,
+                    temperature=temperature,
+                    config=text_config
+                )
+            elif provider == "local" and not use_api:
+                # Use local transformers model (legacy support)
+                api_result = self._generate_via_local_model(
+                    formatted_prompt,
+                    max_length=max_length,
+                    temperature=temperature,
+                    config=text_config
+                )
+            else:
                 failure_metadata = {
-                    "error": "GEMINI_API_KEY is not set. Add it to ai/.env file. Get your key from: https://aistudio.google.com/app/apikey",
+                    "error": f"Unknown provider: {provider}",
                     "cache_key": cache_key,
                     "duration_ms": (datetime.utcnow() - start_time).total_seconds() * 1000
                 }
@@ -275,16 +317,9 @@ class TextGenerationAgent:
                 )
                 return {
                     "success": False,
-                    "error": "GEMINI_API_KEY is not set. Add it to ai/.env file. Get your key from: https://aistudio.google.com/app/apikey",
+                    "error": f"Unknown provider: {provider}. Supported providers: gemini, ollama, local",
                     "text": ""
                 }
-            
-            api_result = self._generate_via_gemini_api(
-                formatted_prompt,
-                max_length=max_length,
-                temperature=temperature,
-                config=text_config
-            )
             
             if not api_result.get("success"):
                 failure_metadata = {
@@ -352,7 +387,7 @@ class TextGenerationAgent:
                 
                 # Generate
                 generation_config = {
-                    "max_new_tokens": max_length or config.get("max_new_tokens", 512),
+                    "max_new_tokens": max_length or config.get("max_new_tokens", 2048),
                     "temperature": temperature or config.get("temperature", 0.7),
                     "top_p": config.get("top_p", 0.9),
                     "top_k": config.get("top_k", 50),
@@ -381,6 +416,8 @@ class TextGenerationAgent:
             provider = text_config.get("provider", config_obj.llm_provider)
             if provider == "gemini":
                 model_name = config_obj.gemini_model_id or text_config.get("name") or "gemini-2.5-flash"
+            elif provider == "ollama":
+                model_name = text_config.get("ollama_model") or text_config.get("name") or "deepseek-r1:1.5b"
             else:
                 model_name = text_config.get("name") or text_config.get("active_model", "unknown")
             gen_config = text_config.get("generation", {})
@@ -395,7 +432,7 @@ class TextGenerationAgent:
                     "name": model_name,
                     "provider": provider,
                     "use_api": text_config.get("use_api", True),
-                    "max_new_tokens": max_length or gen_config.get("max_new_tokens", 512),
+                    "max_new_tokens": max_length or gen_config.get("max_new_tokens", 2048),
                     "temperature": temperature if temperature is not None else gen_config.get("temperature", 0.7),
                     "top_p": gen_config.get("top_p", 0.9),
                     "top_k": gen_config.get("top_k", 50),
@@ -755,6 +792,194 @@ class TextGenerationAgent:
                 "text": ""
             }
     
+    def _generate_via_ollama_api(self,
+                                  prompt: str,
+                                  max_length: Optional[int] = None,
+                                  temperature: Optional[float] = None,
+                                  config: Optional[Dict] = None) -> Dict[str, Any]:
+        """Generate text using Ollama API (local)"""
+        # Get Ollama configuration
+        ollama_model = config.get("ollama_model", "deepseek-r1:1.5b") if config else "deepseek-r1:1.5b"
+        ollama_base_url = config.get("ollama_base_url", "http://localhost:11434") if config else "http://localhost:11434"
+        
+        # Use config defaults if not provided
+        gen_config = config.get("generation", {}) if config else {}
+        max_tokens = max_length or gen_config.get("max_new_tokens", 2048)
+        temp = temperature if temperature is not None else gen_config.get("temperature", 0.7)
+        
+        # Ollama API endpoint
+        endpoint_url = f"{ollama_base_url}/api/generate"
+        
+        logger.info(f"Using Ollama model: {ollama_model} at {ollama_base_url}")
+        
+        payload = {
+            "model": ollama_model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "num_predict": max_tokens,
+                "temperature": temp,
+                "top_p": gen_config.get("top_p", 0.9),
+                "top_k": gen_config.get("top_k", 50),
+                "repeat_penalty": gen_config.get("repetition_penalty", 1.1)
+            }
+        }
+        
+        try:
+            logger.info(f"Calling Ollama API: {ollama_model}")
+            
+            response = requests.post(
+                endpoint_url,
+                headers={
+                    "Content-Type": "application/json"
+                },
+                json=payload,
+                timeout=300
+            )
+            
+            if not response.ok:
+                error_text = response.text
+                logger.error(f"Ollama API error: {error_text}")
+                return {
+                    "success": False,
+                    "error": f"Ollama API error (status {response.status_code}): {error_text}",
+                    "text": ""
+                }
+            
+            result = response.json()
+            
+            # Log the full response for debugging
+            logger.debug(f"Ollama API response: {json.dumps(result, indent=2)}")
+            
+            # Extract generated text from Ollama response
+            generated_text = result.get("response", "")
+            
+            if not generated_text:
+                logger.error(f"Ollama API returned empty response. Full response: {json.dumps(result, indent=2)}")
+                return {
+                    "success": False,
+                    "error": f"Ollama API returned empty response. Response structure: {list(result.keys())}",
+                    "text": ""
+                }
+            
+            # Clean markdown formatting from response
+            generated_text = self._clean_markdown_formatting(generated_text)
+            
+            return {
+                "success": True,
+                "text": generated_text
+            }
+            
+        except requests.exceptions.ConnectionError:
+            return {
+                "success": False,
+                "error": f"Could not connect to Ollama at {ollama_base_url}. Make sure Ollama is running. Start it with: ollama serve",
+                "text": ""
+            }
+        except requests.exceptions.Timeout:
+            return {
+                "success": False,
+                "error": "Request to Ollama API timed out",
+                "text": ""
+            }
+        except Exception as e:
+            logger.error(f"Ollama API call failed: {e}")
+            return {
+                "success": False,
+                "error": f"Ollama API request failed: {str(e)}",
+                "text": ""
+            }
+    
+    def _generate_via_local_model(self,
+                                    prompt: str,
+                                    max_length: Optional[int] = None,
+                                    temperature: Optional[float] = None,
+                                    config: Optional[Dict] = None) -> Dict[str, Any]:
+        """Generate text using local transformers model"""
+        if not HAS_TORCH:
+            return {
+                "success": False,
+                "error": "PyTorch is required for local model generation. Install with: pip install torch",
+                "text": ""
+            }
+        
+        # Load model locally if not already loaded
+        if self.text_model is None:
+            try:
+                self.text_model = self.model_manager.load_text_model()
+            except ImportError as e:
+                return {
+                    "success": False,
+                    "error": f"AI models not installed: {str(e)}",
+                    "text": ""
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Failed to load local model: {str(e)}",
+                    "text": ""
+                }
+        
+        # Get model and tokenizer
+        model_data = self.text_model
+        model = model_data["model"]
+        tokenizer = model_data["tokenizer"]
+        model_config = model_data["config"]
+        
+        # Use config defaults if not provided
+        gen_config = model_config.get("generation", {})
+        max_tokens = max_length or gen_config.get("max_new_tokens", 2048)
+        temp = temperature if temperature is not None else gen_config.get("temperature", 0.7)
+        
+        try:
+            # Tokenize
+            inputs = tokenizer(
+                prompt,
+                return_tensors="pt",
+                truncation=True,
+                max_length=model_config.get("max_length", 2048)
+            )
+            
+            # Move to device
+            device = next(model.parameters()).device
+            inputs = {k: v.to(device) for k, v in inputs.items()}
+            
+            # Generate
+            generation_config = {
+                "max_new_tokens": max_tokens,
+                "temperature": temp,
+                "top_p": gen_config.get("top_p", 0.9),
+                "top_k": gen_config.get("top_k", 50),
+                "repetition_penalty": gen_config.get("repetition_penalty", 1.1),
+                "do_sample": True,
+                "pad_token_id": tokenizer.eos_token_id
+            }
+            
+            with torch.no_grad():
+                outputs = model.generate(**inputs, **generation_config)
+            
+            # Decode
+            generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            # Remove input prompt from output
+            if generated_text.startswith(prompt):
+                generated_text = generated_text[len(prompt):].strip()
+            
+            # Clean markdown formatting
+            generated_text = self._clean_markdown_formatting(generated_text)
+            
+            return {
+                "success": True,
+                "text": generated_text
+            }
+            
+        except Exception as e:
+            logger.error(f"Local model generation failed: {e}")
+            return {
+                "success": False,
+                "error": f"Local model generation failed: {str(e)}",
+                "text": ""
+            }
+    
     def _generate_via_hf_api(self,
                              prompt: str,
                              max_length: Optional[int] = None,
@@ -790,7 +1015,7 @@ class TextGenerationAgent:
         
         # Use config defaults if not provided
         gen_config = config.get("generation", {}) if config else {}
-        max_new_tokens = max_length or gen_config.get("max_new_tokens", 512)
+        max_new_tokens = max_length or gen_config.get("max_new_tokens", 2048)
         temp = temperature if temperature is not None else gen_config.get("temperature", 0.7)
         
         # For Mistral and other chat models, use chat/completions format
@@ -964,9 +1189,17 @@ class TextGenerationAgent:
                                 topic: str,
                                 num_slides: int = 5,
                                 context: Optional[Dict] = None) -> Dict[str, Any]:
-        """Generate slide content for a topic"""
+        """Generate slide content based on the ACTUAL USER PROMPT, not just subject category"""
+        # Get the actual user prompt - this is what the user wants, not a generic subject
+        user_prompt = context.get("user_prompt") if context else topic
+        subject_category = context.get("subject_category", "") if context else ""
+        
+        # Build prompt that emphasizes the ACTUAL user request
         prompt = f"""You are a slide generator. For each slide produce a JSON object ONLY.
 Do NOT include explanations, markdown, or code fences — return valid JSON. All textual content you emit will be placed directly in the PPT slide title, bullet body, or speaker notes, so never describe placement instructions—just supply the final text itself. Each bullet must be meaningful text that can stand alone on a slide (no placeholders like "Topic 2").
+
+CRITICAL: Generate slides based on the ACTUAL USER REQUEST below. Do NOT generate generic slides about a subject category. 
+Focus on what the user specifically asked for.
 
 OUTPUT SCHEMA (exact):
 {{
@@ -982,14 +1215,21 @@ OUTPUT SCHEMA (exact):
   ]
 }}
 
+USER'S ACTUAL REQUEST (generate slides for THIS, not a generic subject):
+"{user_prompt}"
+
+{f"Subject category (for context only, NOT the topic): {subject_category}" if subject_category else ""}
+
 TASK:
-Create a slide deck of {num_slides} slides on the topic: "{topic}".
+Create a slide deck of {num_slides} slides based on the USER'S ACTUAL REQUEST above.
+Generate content that directly addresses what the user asked for, not generic content about a subject category.
 For each slide, output 'title', between 1 and 6 short 'bullets' (each max 12 words)
 and optional 'notes'. If an image is suggested, add an entry in 'images' (id or description).
 Keep language concise and avoid tokens like "Notes:", "```json", "{{", "}}".
 Return only valid JSON matching the schema above."""
         
-        result = self.generate(prompt, context, max_length=4096)
+        # Increase max_length to prevent truncation - expanded content needs more space
+        result = self.generate(prompt, context, max_length=8192)
         
         if result["success"]:
             # Try to parse JSON from response
@@ -1024,6 +1264,205 @@ Return only valid JSON matching the schema above."""
                             "slide_title": slide.get("title")
                         })
                 result["image_markers"] = fallback_markers
+        
+        return result
+    
+    def expand_slide_content_gemini(self,
+                                     slide_json_text: str,
+                                     context: Optional[Dict] = None,
+                                     max_length: int = 8192) -> Dict[str, Any]:
+        """
+        Re-run slide JSON through Gemini to expand and enrich the textual content.
+        This is the second pass (after initial generation) to make content more detailed.
+        """
+        prompt = f"""You will receive an existing slide deck as JSON. The content needs to be expanded and enriched.
+
+CRITICAL INSTRUCTIONS:
+- Expand ONLY the textual fields (titles, bullets, notes) with MORE DETAIL and DEPTH
+- Keep the exact JSON structure (same slides, same keys, same number of bullets and images)
+- Expand each bullet into a clear, detailed sentence (40-60 words). Keep the same number of bullets.
+- Expand titles to be more descriptive (up to 120 characters) while keeping them concise
+- If a slide has "notes", expand to 150-250 words of comprehensive speaker notes
+- CRITICAL: Preserve ALL image placeholders exactly as they are. Do NOT modify, add, or remove any entries in the "images" array
+- Do not add new slides, fields, or images
+- Return ONLY valid JSON. No markdown, no prose outside the JSON
+
+Existing slide JSON:
+{slide_json_text}
+"""
+        # Use Gemini for this expansion pass
+        result = self.generate(prompt, context, max_length=max_length)
+        
+        if result.get("success"):
+            try:
+                # Parse original JSON to preserve image placeholders
+                original_content = None
+                try:
+                    original_json_match = re.search(r'\{.*\}', slide_json_text, re.DOTALL)
+                    if original_json_match:
+                        original_content = json.loads(original_json_match.group())
+                except Exception:
+                    pass
+                
+                # Parse expanded JSON
+                json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
+                if json_match:
+                    content = json.loads(json_match.group())
+                    
+                    # Preserve image placeholders from original
+                    if original_content:
+                        original_slides = original_content.get("slides", [])
+                        expanded_slides = content.get("slides", [])
+                        for idx, (original_slide, expanded_slide) in enumerate(zip(original_slides, expanded_slides)):
+                            if original_slide.get("images"):
+                                expanded_slide["images"] = original_slide["images"]
+                    
+                    result["content"] = content
+                    result["text"] = json.dumps(content, indent=2)
+                    
+                    # Preserve image markers
+                    aggregated_markers = list(result.get("image_markers", []))
+                    for slide in content.get("slides", []):
+                        for image in slide.get("images", []):
+                            aggregated_markers.append({
+                                "marker": image.get("marker") or image.get("id"),
+                                "description": image.get("caption") or image.get("alt_text") or image.get("marker") or image.get("id"),
+                                "placement": image.get("placement", "auto"),
+                                "slide_title": slide.get("title")
+                            })
+                    result["image_markers"] = aggregated_markers
+            except Exception as e:
+                logger.warning(f"Failed to parse Gemini expanded slide JSON: {e}")
+        
+        return result
+    
+    def expand_slide_content(self,
+                             slide_json_text: str,
+                             context: Optional[Dict] = None,
+                             max_length: int = 8192) -> Dict[str, Any]:
+        """
+        Re-run slide JSON through deepseek-r1:1.5b (Ollama) to further enlarge and elaborate the textual content.
+        This is the third pass (after Gemini expansion) to add final detail and make it PPT-ready.
+        The structure and slide count must remain the same; only enrich bullet text and notes. Image placeholders are preserved.
+        """
+        prompt = f"""You will receive an existing slide deck as JSON that has already been expanded twice (once through Gemini). 
+This is the FINAL expansion pass - make the content RICH, DETAILED, and COMPREHENSIVE for PPT slides.
+
+CRITICAL INSTRUCTIONS:
+- This is the THIRD pass - content should be VERY detailed and comprehensive
+- Expand ONLY the textual fields (titles, bullets, notes) with MAXIMUM detail and depth
+- Keep the exact JSON structure (same slides, same keys, same number of bullets and images)
+- Expand each bullet into a comprehensive, detailed sentence (50-80 words). Keep the same number of bullets.
+- Make bullets informative, educational, and suitable for presentation slides
+- Expand titles to be descriptive and informative (up to 120 characters)
+- If a slide has "notes", expand to 200-300 words of comprehensive speaker notes
+- CRITICAL: Preserve ALL image placeholders exactly as they are. Do NOT modify, add, or remove any entries in the "images" array
+- Do not add new slides, fields, or images
+- Return ONLY valid JSON. No markdown, no prose outside the JSON
+
+Existing slide JSON:
+{slide_json_text}
+"""
+        # Use deepseek-r1:1.5b (Ollama) for content expansion
+        # Get the deepseek model config from registry
+        deepseek_config = None
+        for model in self.model_manager.model_registry.get("models", {}).get("text", {}).get("available_models", []):
+            if model.get("name") == "deepseek-r1:1.5b":
+                deepseek_config = model.copy()
+                # Merge with generation settings
+                gen_settings = self.model_manager.model_registry.get("models", {}).get("text", {}).get("generation", {})
+                deepseek_config.update(gen_settings)
+                break
+        
+        # Fallback to default deepseek config if not found in registry
+        if not deepseek_config:
+            deepseek_config = {
+                "provider": "ollama",
+                "ollama_model": "deepseek-r1:1.5b",
+                "ollama_base_url": "http://localhost:11434",
+                "generation": {
+                    "temperature": 0.7,
+                    "max_new_tokens": max_length or 4096,
+                    "top_p": 0.9,
+                    "top_k": 50,
+                    "repetition_penalty": 1.1
+                }
+            }
+        
+        # Format prompt with context if needed
+        formatted_prompt = self._format_prompt(prompt, context)
+        
+        # Call Ollama API directly with deepseek model
+        result = self._generate_via_ollama_api(
+            formatted_prompt,
+            max_length=max_length,
+            temperature=deepseek_config.get("generation", {}).get("temperature", 0.7),
+            config=deepseek_config
+        )
+
+        if result.get("success"):
+            try:
+                # Parse original JSON to preserve image placeholders
+                original_content = None
+                try:
+                    original_json_match = re.search(r'\{.*\}', slide_json_text, re.DOTALL)
+                    if original_json_match:
+                        original_content = json.loads(original_json_match.group())
+                except Exception:
+                    pass
+                
+                # Parse expanded JSON
+                json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
+                if json_match:
+                    content = json.loads(json_match.group())
+                    
+                    # Preserve image placeholders from original if missing in expanded version
+                    if original_content:
+                        original_slides = original_content.get("slides", [])
+                        expanded_slides = content.get("slides", [])
+                        for idx, (original_slide, expanded_slide) in enumerate(zip(original_slides, expanded_slides)):
+                            # If expanded slide has no images or empty images array, restore from original
+                            if not expanded_slide.get("images") or len(expanded_slide.get("images", [])) == 0:
+                                if original_slide.get("images"):
+                                    expanded_slide["images"] = original_slide["images"]
+                            # Otherwise, ensure all original image fields are preserved
+                            elif original_slide.get("images"):
+                                # Merge: keep expanded images but ensure original structure is maintained
+                                original_images = original_slide.get("images", [])
+                                expanded_images = expanded_slide.get("images", [])
+                                # If counts don't match, restore original
+                                if len(expanded_images) != len(original_images):
+                                    expanded_slide["images"] = original_images
+                                else:
+                                    # Preserve original image structure (id, caption, marker, etc.)
+                                    for img_idx, orig_img in enumerate(original_images):
+                                        if img_idx < len(expanded_images):
+                                            # Merge: keep original keys, update only if expanded has new valid data
+                                            merged_img = orig_img.copy()
+                                            expanded_img = expanded_images[img_idx]
+                                            # Only update caption if expanded version has a better one
+                                            if expanded_img.get("caption") and len(expanded_img.get("caption", "")) > len(orig_img.get("caption", "")):
+                                                merged_img["caption"] = expanded_img["caption"]
+                                            expanded_images[img_idx] = merged_img
+                                    expanded_slide["images"] = expanded_images
+                    
+                    result["content"] = content
+                    result["text"] = json.dumps(content, indent=2)  # Update text with preserved images
+                    
+                    # Preserve image markers if any were included
+                    aggregated_markers = list(result.get("image_markers", []))
+                    for slide in content.get("slides", []):
+                        for image in slide.get("images", []):
+                            aggregated_markers.append({
+                                "marker": image.get("marker") or image.get("id"),
+                                "description": image.get("caption") or image.get("alt_text") or image.get("marker") or image.get("id"),
+                                "placement": image.get("placement", "auto"),
+                                "slide_title": slide.get("title")
+                            })
+                    result["image_markers"] = aggregated_markers
+            except Exception as e:
+                logger.warning(f"Failed to parse expanded slide JSON: {e}")
+                # On failure, return the original text so caller can fall back
         
         return result
     
@@ -1072,32 +1511,42 @@ Format your response as JSON:
                                slide_title: str,
                                slide_content: List[str],
                                context: Optional[Dict] = None) -> Dict[str, Any]:
-        """Generate speaker notes for a slide"""
+        """Generate speaker notes for a slide based on ACTUAL slide content, not the topic"""
         content_text = "\n".join([f"- {point}" for point in slide_content])
         
-        prompt = f"""Create detailed speaker notes for this slide:
+        prompt = f"""CRITICAL: Generate detailed speaker notes based ONLY on the ACTUAL slide content provided below. 
+DO NOT generate generic notes about the topic. Focus EXCLUSIVELY on the specific content in the bullets.
 
-Title: {slide_title}
+Slide Title: {slide_title}
 
-Content:
+ACTUAL Slide Content (bullets):
 {content_text}
 
+INSTRUCTIONS:
+- Generate speaker notes that directly reference and elaborate on EACH bullet point shown above
+- Do NOT create generic notes about "{slide_title}" as a topic
+- Base your notes on the SPECIFIC content in the bullets provided
+- For each bullet, create talking points that explain and expand on that specific point
+- Provide examples that relate to the actual content in the bullets
+- Create transitions that reference the actual content discussed
+
 Generate:
-- Main talking points
-- Examples to mention
-- Transitions to next slide
-- Audience engagement questions
+- Main talking points (based on the actual bullets)
+- Detailed talking points (elaborating each bullet)
+- Examples to mention (related to the actual content)
+- Transitions to next slide (referencing the actual content)
+- Audience engagement questions (about the actual content)
 
 Format as JSON:
 {{
-  "main_points": ["Point 1", "Point 2"],
-  "talking_points": ["Talking point 1", "Talking point 2"],
-  "examples": ["Example 1", "Example 2"],
-  "transitions": ["Transition phrase"],
-  "engagement": ["Question 1", "Question 2"]
+  "main_points": ["Point 1 based on actual content", "Point 2 based on actual content"],
+  "talking_points": ["Detailed explanation of bullet 1", "Detailed explanation of bullet 2"],
+  "examples": ["Example related to actual content", "Another example"],
+  "transitions": ["Transition referencing actual content"],
+  "engagement": ["Question about actual content", "Another question"]
 }}"""
         
-        result = self.generate(prompt, context, max_length=512)
+        result = self.generate(prompt, context, max_length=2048)  # Increased for detailed speaker notes
         
         if result["success"]:
             import json

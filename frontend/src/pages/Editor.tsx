@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { ExportDialog } from '@/components/ExportDialog';
 import { Plus, Trash2, Download, ChevronLeft, ChevronRight, Send, Image, Network, Loader2, Sparkles } from 'lucide-react';
 import { getDeck, generateMediaForDeck, exportDeck, generateSpeakerNotes, generateQuiz, SlideDeck } from '@/lib/api';
 
@@ -34,7 +36,9 @@ const Editor = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     const loadDeck = async () => {
@@ -137,15 +141,21 @@ const Editor = () => {
     setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1));
   };
 
-  const exportPresentation = async () => {
+  const handleExportClick = () => {
+    setExportDialogOpen(true);
+  };
+
+  const exportPresentation = async (format: 'pptx' | 'pdf') => {
     if (!id) return;
 
     setIsExporting(true);
+    setExportDialogOpen(false);
     try {
-      await exportDeck(id);
+      const userName = user?.name || 'user';
+      await exportDeck(id, format, userName);
       toast({
         title: 'Success',
-        description: 'Presentation downloaded successfully!',
+        description: `Presentation downloaded as ${format.toUpperCase()}!`,
       });
     } catch (err) {
       toast({
@@ -366,7 +376,7 @@ const Editor = () => {
                 )}
                 Generate Media
               </Button>
-              <Button onClick={exportPresentation} className="flex-1 min-w-[120px]" disabled={isExporting}>
+              <Button onClick={handleExportClick} className="flex-1 min-w-[120px]" disabled={isExporting}>
                 {isExporting ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
@@ -474,6 +484,13 @@ const Editor = () => {
           </div>
         </div>
       </div>
+      
+      <ExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        onExport={exportPresentation}
+        isExporting={isExporting}
+      />
     </div>
   );
 };

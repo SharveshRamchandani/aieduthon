@@ -1,0 +1,6 @@
+// What is Biology?: Biology is the study of life. It explores all living things.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightgreen shape=box style="rounded,filled"]
+	root [label="What is Biology?: Biology is the study of life. It"]
+}

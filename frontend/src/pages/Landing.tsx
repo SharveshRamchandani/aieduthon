@@ -50,7 +50,7 @@ const Landing = () => {
                   <motion.span
                     key={index}
                     className="absolute font-semibold"
-                    initial={{ opacity: 0, y: "-100" }}
+                    initial={{ opacity: 0, y: -100 }}
                     transition={{ type: "spring", stiffness: 50 }}
                     animate={
                       titleNumber === index
@@ -74,14 +74,14 @@ const Landing = () => {
             </h1>
             <div className="flex gap-4 flex-col items-center">
             <button className="btn" onClick={handleGetStarted}>
-              <svg className="sparkle" width="24" height="24" viewBox="0 0 24 24" stroke-width="1">
+            <svg className="sparkle" width="24" height="24" viewBox="0 0 24 24" strokeWidth="1">
                 <path d="M14.187 8.096L15 5.25L15.813 8.096C16.0231 8.82683 16.4171 9.49215 16.9577 10.0294C17.4984 10.5666 18.1676 10.9578 18.9005 11.1649L21.75 12L18.9005 12.8351C18.1676 13.0422 17.4984 13.4334 16.9577 13.9706C16.4171 14.5078 16.0231 15.1732 15.813 15.904L15 18.75L14.187 15.904C13.9769 15.1732 13.5829 14.5078 13.0423 13.9706C12.5016 13.4334 11.8324 13.0422 11.0995 12.8351L8.25 12L11.0995 11.1649C11.8324 10.9578 12.5016 10.5666 13.0423 10.0294C13.5829 9.49215 13.9769 8.82683 14.187 8.096Z" />
-                <path d="M6 12H8.25" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M18.75 12H21" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M10.0913 3.62305L11.25 6.75" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M13.7412 17.25L12.5825 20.377" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M3.62305 13.9087L6.75 12.75" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M17.25 13.7412L20.377 12.5825" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M6 12H8.25" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M18.75 12H21" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M10.0913 3.62305L11.25 6.75" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M13.7412 17.25L12.5825 20.377" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3.62305 13.9087L6.75 12.75" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M17.25 13.7412L20.377 12.5825" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span className="text">Get Started</span>
               <MoveRight className="w-4 h-4" />

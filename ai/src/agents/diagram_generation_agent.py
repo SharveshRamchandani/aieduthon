@@ -337,7 +337,7 @@ Return JSON:
   }}
 }}"""
             
-            result = text_agent.generate(prompt, max_length=512)
+            result = text_agent.generate(prompt, max_length=2048)  # Increased for diagram generation
             if result.get("success"):
                 try:
                     import json

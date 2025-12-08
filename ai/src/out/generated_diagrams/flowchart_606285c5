@@ -1,0 +1,9 @@
+// Photosynthesis and Food Chains: Plants are the primary producers in most ecosystems, forming the base of the food chain. They capture sunlight and convert it into chemical energy, providing the energy source for herbivores.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1
+}

@@ -31,10 +31,17 @@ except ImportError:
 
 try:
     from diffusers import StableDiffusionPipeline
+    try:
+        from diffusers import StableDiffusion3Pipeline
+    except ImportError:
+        StableDiffusion3Pipeline = None
     HAS_DIFFUSERS = True
 except ImportError:
     HAS_DIFFUSERS = False
     StableDiffusionPipeline = None
+    StableDiffusion3Pipeline = None
+
+import requests
 
 try:
     from transformers import BlipProcessor, BlipForConditionalGeneration
@@ -81,8 +88,8 @@ class ModelManager:
         return {
             "models": {
                 "text": {
-                    "active_model": "meta-llama/Llama-2-7b-chat-hf",
-                    "quantization": {"enabled": True, "load_in_8bit": True}
+                    "active_model": "mistralai/Mistral-7B-Instruct-v0.2",
+                    "quantization": {"enabled": False, "load_in_8bit": False}
                 },
                 "image": {
                     "active_model": "stabilityai/stable-diffusion-2-1"
@@ -102,10 +109,57 @@ class ModelManager:
         # Find model in available models
         for model in text_config.get("available_models", []):
             if model["name"] == active_model:
-                return {**model, **text_config.get("quantization", {}), 
-                       **text_config.get("generation", {})}
+                # Merge configs, but normalize quantization field
+                merged_config = {**model}
+                
+                # Handle quantization: normalize boolean to dict if needed
+                model_quantization = model.get("quantization")
+                text_quantization = text_config.get("quantization", {})
+                
+                if isinstance(model_quantization, bool):
+                    # If model has boolean quantization, use text_config quantization dict
+                    # but enable it if the boolean is True
+                    if model_quantization and isinstance(text_quantization, dict):
+                        merged_config["quantization"] = text_quantization
+                    else:
+                        merged_config["quantization"] = {"enabled": model_quantization}
+                elif isinstance(model_quantization, dict):
+                    # Merge quantization dicts, model takes precedence
+                    merged_config["quantization"] = {**text_quantization, **model_quantization}
+                elif isinstance(text_quantization, dict):
+                    merged_config["quantization"] = text_quantization
+                else:
+                    merged_config["quantization"] = {}
+                
+                # Merge generation settings
+                merged_config.update(text_config.get("generation", {}))
+                
+                # Add provider, use_api, and api_version from text_config if not in model
+                if "provider" not in merged_config:
+                    merged_config["provider"] = text_config.get("provider")
+                if "use_api" not in merged_config:
+                    merged_config["use_api"] = text_config.get("use_api", False)
+                if "api_version" not in merged_config:
+                    # Get api_version from model config, or default based on model name
+                    model_api_version = model.get("api_version")
+                    if model_api_version:
+                        merged_config["api_version"] = model_api_version
+                    else:
+                        # Default: v1beta for gemma models, v1 for others
+                        if "gemma" in merged_config.get("name", "").lower():
+                            merged_config["api_version"] = "v1beta"
+                        else:
+                            merged_config["api_version"] = "v1"
+                
+                return merged_config
         
-        return text_config
+        # If model not found in available_models, return text_config with defaults
+        result = text_config.copy()
+        if "provider" not in result:
+            result["provider"] = None
+        if "use_api" not in result:
+            result["use_api"] = False
+        return result
     
     def get_image_model_config(self) -> Dict[str, Any]:
         """Get active image model configuration"""
@@ -115,7 +169,8 @@ class ModelManager:
         # Find model in available models
         for model in image_config.get("available_models", []):
             if model["name"] == active_model:
-                return {**model, **image_config.get("generation", {})}
+                merged = {**image_config.get("generation", {}), **model}
+                return merged
         
         return image_config
     
@@ -128,7 +183,7 @@ class ModelManager:
             )
         
         config = self.get_text_model_config()
-        model_name = model_name or config["name"]
+        model_name = model_name or config.get("name") or config.get("active_model")
         cache_key = f"text_{model_name}"
         
         if cache_key in self.loaded_models and not force_reload:
@@ -138,21 +193,38 @@ class ModelManager:
         logger.info(f"Loading text model: {model_name}")
         
         try:
-            # Setup quantization if enabled
+            # Setup quantization if enabled and CUDA is available
             quantization_config = None
-            if config.get("quantization", {}).get("enabled", False):
-                if config.get("quantization", {}).get("load_in_8bit", False):
-                    quantization_config = BitsAndBytesConfig(
-                        load_in_8bit=True,
-                        llm_int8_threshold=6.0
-                    )
-                elif config.get("quantization", {}).get("load_in_4bit", False):
-                    quantization_config = BitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_compute_dtype=torch.float16,
-                        bnb_4bit_use_double_quant=True,
-                        bnb_4bit_quant_type="nf4"
-                    )
+            quantization = config.get("quantization", {})
+            # Ensure quantization is a dict (handle boolean case)
+            if isinstance(quantization, bool):
+                quantization = {"enabled": quantization}
+            elif not isinstance(quantization, dict):
+                quantization = {}
+            
+            # Check if CUDA is available for quantization
+            cuda_available = HAS_TORCH and torch.cuda.is_available()
+            
+            if quantization.get("enabled", False) and cuda_available:
+                try:
+                    if quantization.get("load_in_8bit", False):
+                        quantization_config = BitsAndBytesConfig(
+                            load_in_8bit=True,
+                            llm_int8_threshold=6.0
+                        )
+                    elif quantization.get("load_in_4bit", False):
+                        quantization_config = BitsAndBytesConfig(
+                            load_in_4bit=True,
+                            bnb_4bit_compute_dtype=torch.float16,
+                            bnb_4bit_use_double_quant=True,
+                            bnb_4bit_quant_type="nf4"
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to setup quantization (bitsandbytes may require CUDA): {e}. Falling back to non-quantized model.")
+                    quantization_config = None
+            elif quantization.get("enabled", False) and not cuda_available:
+                logger.warning("Quantization requested but CUDA not available. Loading model without quantization.")
+                quantization_config = None
             
             # Load tokenizer
             tokenizer = AutoTokenizer.from_pretrained(
@@ -172,12 +244,19 @@ class ModelManager:
                 "trust_remote_code": True
             }
             
+            # Auto-detect device if needed
+            if device_map == "auto":
+                device_map = "cuda" if cuda_available else "cpu"
+            
             if quantization_config:
                 model_kwargs["quantization_config"] = quantization_config
             else:
                 model_kwargs["device_map"] = device_map
-                if device_map == "auto" or device_map.startswith("cuda"):
+                # Only use float16 if CUDA is available, otherwise use float32 for CPU
+                if device_map.startswith("cuda") and cuda_available:
                     model_kwargs["torch_dtype"] = torch.float16
+                elif device_map == "cpu":
+                    model_kwargs["torch_dtype"] = torch.float32
             
             model = AutoModelForCausalLM.from_pretrained(
                 model_name,
@@ -200,12 +279,6 @@ class ModelManager:
     
     def load_image_model(self, model_name: Optional[str] = None, force_reload: bool = False):
         """Load image generation model"""
-        if not HAS_DIFFUSERS or not HAS_TORCH:
-            raise ImportError(
-                "Diffusers and PyTorch are required for image generation. "
-                "Install with: pip install diffusers torch"
-            )
-        
         config = self.get_image_model_config()
         model_name = model_name or config["name"]
         cache_key = f"image_{model_name}"
@@ -216,21 +289,69 @@ class ModelManager:
         
         logger.info(f"Loading image model: {model_name}")
         
+        provider = config.get("provider")
+        if provider == "huggingface":
+            # No local pipeline to load; we store API metadata
+            api_config = {
+                "type": "huggingface",
+                "endpoint": config.get("api_model", model_name)
+            }
+            self.loaded_models[cache_key] = {
+                "pipe": None,
+                "config": {**config, **api_config}
+            }
+            logger.info(f"Configured Hugging Face inference model: {model_name}")
+            return self.loaded_models[cache_key]
+        if provider == "stability":
+            stability_config = {
+                "type": "stability",
+                "model_id": config.get("model_id", "stable-diffusion-xl-1024-v1-0"),
+            }
+            self.loaded_models[cache_key] = {
+                "pipe": None,
+                "config": {**config, **stability_config}
+            }
+            logger.info(f"Configured Stability AI hosted model: {model_name}")
+            return self.loaded_models[cache_key]
+        
+        if not HAS_DIFFUSERS or not HAS_TORCH:
+            raise ImportError(
+                "Diffusers and PyTorch are required for local image generation. "
+                "Install with: pip install diffusers torch"
+            )
+        
         try:
             device_map = self.model_registry["deployment"].get("device", "auto")
             if device_map == "auto":
                 device_map = "cuda" if torch.cuda.is_available() else "cpu"
             
-            # Load Stable Diffusion pipeline
-            pipe = StableDiffusionPipeline.from_pretrained(
-                model_name,
-                cache_dir=str(self.cache_dir),
-                torch_dtype=torch.float16 if device_map == "cuda" else torch.float32
-            )
+            model_source = config.get("weights_path") or model_name
+            pipeline_type = config.get("pipeline", "sd15")
+            torch_dtype = torch.float16 if device_map == "cuda" else torch.float32
+            
+            if pipeline_type == "sd3":
+                if StableDiffusion3Pipeline is None:
+                    raise ImportError(
+                        "StableDiffusion3Pipeline not available. Upgrade diffusers to >=0.29.0"
+                    )
+                if device_map == "cuda" and hasattr(torch, "bfloat16"):
+                    torch_dtype = torch.bfloat16
+                pipe = StableDiffusion3Pipeline.from_pretrained(
+                    model_source,
+                    cache_dir=str(self.cache_dir),
+                    torch_dtype=torch_dtype,
+                    use_safetensors=True
+                )
+            else:
+                pipe = StableDiffusionPipeline.from_pretrained(
+                    model_source,
+                    cache_dir=str(self.cache_dir),
+                    torch_dtype=torch_dtype,
+                    use_safetensors=True
+                )
             
             pipe = pipe.to(device_map)
             
-            # Store in cache
             self.loaded_models[cache_key] = {
                 "pipe": pipe,
                 "config": config

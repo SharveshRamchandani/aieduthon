@@ -1,0 +1,6 @@
+// The Process: Chlorophyll: Chlorophyll is the green pigment found within chloroplasts, specialized organelles inside plant cells, that captures light energy. This pigment absorbs specific wavelengths of light, primarily red and blue, which is why plants appear green to our eyes.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightgreen shape=box style="rounded,filled"]
+	root [label="The Process: Chlorophyll: Chlorophyll is the green"]
+}

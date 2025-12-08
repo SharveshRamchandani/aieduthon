@@ -1,0 +1,9 @@
+// The Process: Light Reactions: Sunlight hits chlorophyll. Water is split, releasing oxygen.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1
+}

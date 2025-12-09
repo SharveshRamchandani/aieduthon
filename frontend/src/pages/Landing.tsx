@@ -36,13 +36,13 @@ const Landing = () => {
   }, [titleNumber, titles]);
 
   return (
-    <div className="w-full min-h-screen">
+    <div className="w-full min-h-screen ">
       <TopBar />
-      <div className="container mx-auto">
+      <div className="container mx-auto ">
         <div className="flex gap-8 py-50 lg:py-34 sm:py-32 md:py-32 items-center justify-center flex-col ">
           
-          <div className="flex gap-4 flex-col">
-            <h1 className="text-5xl md:text-7xl sm:text-7xl max-w-6xl tracking-tighter text-center font-regular pt-8">
+          <div className="flex gap-4 flex-col ">
+            <h1 className="text-5xl md:text-7xl sm:text-7xl max-w-6xl tracking-tighter text-center font-regular pt-8 scrollbar-hide">
               <span className="text-primary">Personalized Presentation Generator for</span>
               <span className="relative flex w-full justify-center overflow-hidden text-center md:pb-4 md:pt-1">
                 &nbsp;

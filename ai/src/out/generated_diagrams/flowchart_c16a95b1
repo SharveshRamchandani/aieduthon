@@ -1,0 +1,10 @@
+// Cellular Processes: Photosynthesis: Energy production. Respiration: Energy release.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label=Photosynthesis]
+	step2 [label=Respiration]
+	step1 -> step2 [label="Energy Production"]
+}

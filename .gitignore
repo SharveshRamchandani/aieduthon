@@ -21,3 +21,12 @@ Thumbs.db
 
 # Node
 node_modules/
+
+# Model cache files (too large for git)
+ai/src/models_cache/
+models_cache/
+*.incomplete
+*.safetensors
+*.bin
+*.pt
+*.pth

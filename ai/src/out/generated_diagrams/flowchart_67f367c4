@@ -1,0 +1,16 @@
+// What is Science?: Science is about understanding the world around us. It’s a systematic way of asking questions.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label="What is Science?"]
+	step1 [label="Science is about understanding the world around us. It’s a systematic way of asking questions."]
+	step2 [label="It’s a systematic way of asking questions."]
+	step3 [label="Science involves observation, experimentation, and analysis."]
+	step4 [label="Science seeks to explain phenomena and predict future events."]
+	step5 [label="Science is a continuous process of learning and refinement."]
+	step1 -> step2 [label=Explains]
+	step1 -> step3 [label=Involves]
+	step1 -> step4 [label=Seeks]
+	step1 -> step5 [label="Continuous Process"]
+}

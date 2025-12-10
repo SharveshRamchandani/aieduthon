@@ -1,0 +1,9 @@
+// The Process: Converting Light to Sugar: Water molecules are split through a process called photolysis, releasing electrons and oxygen as byproducts. Carbon dioxide enters the leaves through stomata and is incorporated into organic molecules within the chloroplasts.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1 [label="Light to Sugar"]
+}

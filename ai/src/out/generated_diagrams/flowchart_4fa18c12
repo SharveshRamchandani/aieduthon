@@ -1,0 +1,11 @@
+// What is Photosynthesis?: Plants make their own food! It’s the foundation of most ecosystems.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label="What is Photosynthesis?"]
+	step1 [label="Plants make their own food!"]
+	step1 -> sunlight [label="Energy source"]
+	step1 -> water [label="Essential ingredient"]
+	step1 -> "carbon dioxide" [label="Raw material"]
+}

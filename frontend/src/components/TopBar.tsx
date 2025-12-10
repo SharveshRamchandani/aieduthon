@@ -3,8 +3,8 @@
 import * as React from "react"
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-// import { Menu, X, Moon, Sun, LogOut, User } from "lucide-react"
-import { Moon, Sun, LogOut, User, Home, Sparkles, Menu, X, Settings } from 'lucide-react';
+import { Menu, X, Moon, Sun, LogOut, User, Home, Sparkles } from 'lucide-react';
+import { Menu, X, Moon, Sun, LogOut, User, Home, Sparkles } from "lucide-react"
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -70,6 +70,23 @@ const TopBar = () => {
       <div className="fixed top-0 left-0 right-0 flex justify-center py-6 px-4 z-50">
         <div className="flex items-center justify-between px-6 py-3 bg-background rounded-full shadow-lg w-full max-w-3xl border border-border">
           <div className="flex items-center">
+    <div className="fixed top-0 left-0 right-0 flex justify-center py-6 px-4 bg-background z-50">
+      <div className="flex items-center justify-between px-6 py-3 bg-background rounded-full shadow-lg w-full max-w-3xl border border-border">
+        <div className="flex items-center">
+          <motion.div
+            className="w-8 h-8 mr-2"
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            whileHover={{ rotate: 10 }}
+            transition={{ duration: 0.3 }}
+          >
+          </motion.div>
+          <span className="text-xl font-bold tracking-tight text-foreground">SlideGen</span>
+        </div>
+        
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center space-x-8">
+          {["Home", "Editor", "Presentations"].map((item) => (
             <motion.div
               className="w-8 h-8 mr-2"
               initial={{ scale: 0.8 }}
@@ -192,6 +209,83 @@ const TopBar = () => {
                     </div>
                   </div>
                 )}
+          ))}
+        </nav>
+
+        {/* Desktop CTA Buttons */}
+        <div className="hidden md:flex items-center space-x-4">
+          {user && (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/home')}
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                Home
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/ai-test')}
+                className="flex items-center gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                AI Test
+              </Button>
+            </>
+          )}
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="rounded-full"
+          >
+            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
+          <motion.div
+            className="flex items-center gap-4"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+            whileHover={{ scale: 1.05 }}
+          >
+            {user && (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/home')}
+                  className="flex items-center gap-2"
+                >
+                  <Home className="h-4 w-4" />
+                  Home
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/ai-test')}
+                  className="flex items-center gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  AI Test
+                </Button>
+              </>
+            )}
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="rounded-full"
+            >
+              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
+          </motion.div>
+          
+          {user ? (
+            <>
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-border">
+                <User className="h-4 w-4" />
+                <span className="text-sm font-medium">{user.name}</span>
               </div>
             ) : (
               <motion.div

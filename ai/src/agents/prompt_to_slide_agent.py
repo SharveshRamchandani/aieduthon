@@ -12,6 +12,8 @@ from dataclasses import dataclass, asdict
 from ai_db import get_ai_db
 from agents.text_generation_agent import TextGenerationAgent
 from agents.media_integration_agent import MediaIntegrationAgent
+from agents.template_selection_agent import TemplateSelectionAgent
+from utils.fix_ppt_pipeline import prepare_slides_from_raw
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,7 @@ class SlideContent:
     key_points: List[str]
     estimated_duration: int  # seconds
     images: List[Dict[str, Any]]
+    notes: str = ""
 
 
 @dataclass
@@ -38,6 +41,8 @@ class SlideDeck:
     difficulty_level: str
     target_audience: str
     image_markers: List[Dict[str, Any]]
+    template_path: Optional[str] = None
+    template_metadata: Optional[Dict[str, Any]] = None
 
 
 class PromptToSlideAgent:
@@ -49,6 +54,7 @@ class PromptToSlideAgent:
         self.slides_collection = self.db["slides"]
         self.text_agent = TextGenerationAgent()
         self.media_agent = MediaIntegrationAgent()
+        self.template_agent = TemplateSelectionAgent()
         
     def generate_slides(self, 
                        prompt_text: str, 
@@ -73,12 +79,45 @@ class PromptToSlideAgent:
             
             # Analyze prompt and extract requirements
             analysis = self._analyze_prompt(prompt_text, context)
+
+            # Respect explicit slide count from context if provided
+            user_requested_slides = None
+            if context:
+                user_requested_slides = context.get("estimated_slides")
+                if isinstance(user_requested_slides, str):
+                    try:
+                        user_requested_slides = int(user_requested_slides)
+                    except ValueError:
+                        user_requested_slides = None
+            if isinstance(user_requested_slides, (int, float)):
+                user_requested_slides = int(user_requested_slides)
+                if user_requested_slides > 0:
+                    analysis["estimated_slides"] = max(3, min(30, user_requested_slides))
             
             # Generate structured content
-            slide_deck, generation_result = self._generate_structured_content(analysis)
+            slide_deck, generation_result = self._generate_structured_content(analysis, prompt_text)
+
+            # Select template and get selection metadata
+            presentation_style = (context or {}).get("presentation_style", "educational")
+            template_path = self.template_agent.select_template(
+                subject=analysis.get("subject", ""),
+                topics=analysis.get("key_topics", []),
+                audience=analysis.get("target_audience"),
+                presentation_style=presentation_style,
+            )
+            slide_deck.template_path = template_path
             
-            # Store generated slides
-            deck_id = self._store_slide_deck(prompt_id, slide_deck, user_id, context)
+            # Store template selection metadata for adaptive use
+            slide_deck.template_metadata = {
+                "selected_template": template_path,
+                "subject": analysis.get("subject", "general"),
+                "style": presentation_style,
+                "audience": analysis.get("target_audience", "general"),
+                "topics": analysis.get("key_topics", [])
+            }
+            
+            # Store generated slides with analysis for category tagging
+            deck_id = self._store_slide_deck(prompt_id, slide_deck, user_id, context, analysis=analysis)
             
             # Generate media (images and diagrams) if requested
             generate_media = context.get("generate_media", True) if context else True
@@ -106,7 +145,8 @@ class PromptToSlideAgent:
             self._emit_analytics_event(user_id, deck_id, "slides_generated", {
                 "total_slides": slide_deck.total_slides,
                 "estimated_duration": slide_deck.estimated_duration,
-                "difficulty_level": slide_deck.difficulty_level
+                "difficulty_level": slide_deck.difficulty_level,
+                "template_path": template_path,
             })
             
             return {
@@ -118,7 +158,9 @@ class PromptToSlideAgent:
                     "generated_at": datetime.utcnow(),
                     "locale": locale,
                     "total_slides": slide_deck.total_slides,
-                    "text_session_id": generation_result.get("session_id")
+                    "text_session_id": generation_result.get("session_id"),
+                    "raw_slide_json": generation_result.get("text"),
+                    "template_path": template_path,
                 }
             }
             
@@ -168,17 +210,20 @@ Return JSON:
   "target_audience": "audience level"
 }}"""
         
-        result = self.text_agent.generate(analysis_prompt, context, max_length=512)
-        
+        # Allow a larger response so the model can return richer analysis
+        # without being truncated at 512 tokens.
+        result = self.text_agent.generate(analysis_prompt, context, max_length=2048)
+
         if result.get("success"):
             try:
                 import re
                 json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
                 if json_match:
                     analysis = json.loads(json_match.group())
-                    # Merge with context
                     if context:
                         analysis["target_audience"] = context.get("grade_level", analysis.get("target_audience", "general"))
+                    analysis.setdefault("estimated_slides", max(5, len(analysis.get("key_topics", [])) or 8))
+                    analysis.setdefault("key_topics", [])
                     return analysis
             except Exception as e:
                 logger.warning(f"Failed to parse LLM analysis: {e}")
@@ -247,13 +292,22 @@ Return JSON:
         
         return topics[:5]  # Max 5 topics
     
-    def _generate_structured_content(self, analysis: Dict[str, Any]) -> Tuple[SlideDeck, Dict[str, Any]]:
-        """Generate structured slide content using LLM"""
+    def _generate_structured_content(self, analysis: Dict[str, Any], original_prompt: str) -> Tuple[SlideDeck, Dict[str, Any]]:
+        """Generate structured slide content using LLM.
+
+        The original teacher prompt is passed through so that the LLM can
+        stay tightly focused on the exact topic (e.g., \"photosynthesis\")
+        instead of drifting to a broad subject category (e.g., \"science\").
+        """
         
-        subject = analysis["subject"]
-        complexity = analysis["complexity"]
-        slide_count = analysis["estimated_slides"]
-        topics = analysis["key_topics"]
+        subject = analysis.get("subject", "general")
+        complexity = analysis.get("complexity", "intermediate")
+        try:
+            slide_count = int(analysis.get("estimated_slides") or 8)
+        except (ValueError, TypeError):
+            slide_count = 8
+        slide_count = max(3, min(30, slide_count))
+        topics = analysis.get("key_topics") or []
         audience = analysis["target_audience"]
         
         # Use LLM to generate slide content
@@ -264,50 +318,100 @@ Return JSON:
             "locale": "en"
         }
         
-        # Build topic string
-        topics_str = ", ".join(topics) if topics else subject
+        # CRITICAL: Use the ACTUAL USER PROMPT as the primary input, NOT the subject
+        # Subject is ONLY for context/metadata, NOT for content generation
+        # The LLM should generate slides based on what the user actually asked for
+        user_prompt = original_prompt.strip()
+        
+        # Build context that includes subject for metadata but uses actual prompt for content
+        enhanced_context = context.copy()
+        enhanced_context["subject_category"] = subject  # Only for context
+        enhanced_context["user_prompt"] = user_prompt  # The actual content to generate
         
         result = self.text_agent.generate_slides_content(
-            topic=topics_str,
+            topic=user_prompt,  # Use ACTUAL prompt, not subject
             num_slides=slide_count,
-            context=context
+            context=enhanced_context
         )
+
+        # Second pass: Expand through Gemini first to make content richer
+        if result.get("success") and result.get("text"):
+            gemini_expanded = self.text_agent.expand_slide_content_gemini(
+                result.get("text", ""),
+                context=context,
+                max_length=8192
+            )
+            if gemini_expanded.get("success") and gemini_expanded.get("text"):
+                result = gemini_expanded
         
-        if result.get("success") and result.get("content"):
-            # Parse LLM-generated content
-            content = result["content"]
-            title = content.get("title", f"{subject.title()} Presentation")
-            slides_data = content.get("slides", [])
+        # Third pass: Expand further through Deepseek for final elaboration
+        if result.get("success") and result.get("text"):
+            deepseek_expanded = self.text_agent.expand_slide_content(
+                result.get("text", ""),
+                context=context,
+                max_length=8192
+            )
+            if deepseek_expanded.get("success") and deepseek_expanded.get("text"):
+                result = deepseek_expanded
+        
+        # CRITICAL: Use the expanded content from LLM, not fallback templates
+        if not result.get("success") or not result.get("text"):
+            logger.error(f"LLM generation failed: {result.get('error', 'Unknown error')}")
+            raise Exception(f"Failed to generate slide content: {result.get('error', 'LLM generation failed')}")
+        
+        # Parse the expanded LLM content
+        try:
+            prepared_payload = prepare_slides_from_raw(
+                result["text"],
+                desired_slide_count=slide_count
+            )
+            title = prepared_payload.get("meta", {}).get("presentation_title", f"{subject.title()} Presentation")
+            slides_data = prepared_payload.get("slides", [])
             
-            slides = []
-            sections = []
-            for slide_data in slides_data:
-                sections.append(slide_data.get("title", ""))
-                slides.append(SlideContent(
-                    title=slide_data.get("title", ""),
-                    bullets=slide_data.get("bullets", []),
-                    examples=slide_data.get("examples", []),
-                    key_points=slide_data.get("key_points", []),
-                    estimated_duration=self._estimate_slide_duration(complexity),
-                    images=slide_data.get("images", [])
-                ))
-        else:
-            # Fallback to template-based generation
-            title = f"{subject.title()} Presentation"
-            if topics:
-                title = f"{topics[0]} - {subject.title()}"
+            if not slides_data or len(slides_data) == 0:
+                logger.error("LLM returned empty slides data")
+                raise Exception("LLM generated empty slides - check LLM response")
             
-            sections = self._generate_sections(subject, topics, slide_count)
-            slides = []
-            for i, section in enumerate(sections):
-                slides.append(SlideContent(
-                    title=f"{i+1}. {section}",
-                    bullets=self._generate_bullets(section, subject, complexity),
-                    examples=self._generate_examples(section, subject, audience),
-                    key_points=self._generate_key_points(section, subject),
-                    estimated_duration=self._estimate_slide_duration(complexity),
-                    images=[]
-                ))
+        except Exception as exc:
+            logger.error(f"Failed to parse LLM-generated slides: {exc}")
+            logger.error(f"LLM response text: {result.get('text', '')[:500]}")
+            raise Exception(f"Failed to parse expanded slide content: {exc}")
+        
+        # Build slides from LLM-generated content
+        slides = []
+        sections = []
+        for slide_data in slides_data:
+            section_title = slide_data.get("title", "")
+            if not section_title:
+                continue  # Skip slides without titles
+            sections.append(section_title)
+            
+            # Get bullets from LLM-generated content
+            bullets = slide_data.get("bullets", [])
+            if not bullets:
+                logger.warning(f"Slide '{section_title}' has no bullets, skipping")
+                continue
+            
+            # Get the expanded content - combine bullets into full text content
+            # This is the content after 3 passes (Gemini -> Gemini -> Deepseek)
+            expanded_content = " ".join(bullets) if bullets else ""
+            if slide_data.get("notes"):
+                expanded_content += " " + slide_data.get("notes", "")
+            
+            slides.append(SlideContent(
+                title=section_title,
+                bullets=bullets,  # Keep for backward compatibility
+                examples=slide_data.get("examples", []),
+                key_points=slide_data.get("key_points", []),
+                estimated_duration=self._estimate_slide_duration(complexity),
+                images=slide_data.get("images", []),
+                notes=expanded_content  # Store expanded content in notes field
+            ))
+        
+        # If we still don't have enough slides, log error but don't use generic fallback
+        if len(slides) < slide_count:
+            logger.warning(f"LLM generated only {len(slides)} slides, requested {slide_count}")
+            # Don't add generic fallback - use what LLM generated
         
         total_duration = sum(slide.estimated_duration for slide in slides)
         image_markers = result.get("image_markers", []) if isinstance(result, dict) else []
@@ -381,8 +485,57 @@ Return JSON:
         }
         return duration_map.get(complexity, 45)
     
-    def _store_slide_deck(self, prompt_id: str, slide_deck: SlideDeck, user_id: str, context: Optional[Dict] = None) -> str:
-        """Store generated slide deck in database"""
+    def _get_subject_tags(self, subject: str) -> List[str]:
+        """Get subject category tags for adaptive template use"""
+        subject_map = {
+            "science": ["science", "stem", "biology", "chemistry", "physics"],
+            "biology": ["science", "biology", "life-sciences", "nature"],
+            "chemistry": ["science", "chemistry", "lab", "experiments"],
+            "physics": ["science", "physics", "mechanics", "energy"],
+            "math": ["science", "mathematics", "numbers", "calculations"],
+            "mathematics": ["science", "mathematics", "numbers", "calculations"],
+            "history": ["history", "social-studies", "past", "events"],
+            "literature": ["literature", "language-arts", "reading", "books"],
+            "geography": ["geography", "social-studies", "places", "maps"],
+            "business": ["business", "economics", "commerce", "finance"],
+            "technology": ["technology", "tech", "computers", "digital"],
+        }
+        base_tags = subject_map.get(subject.lower(), [subject.lower()])
+        return list(set(base_tags))
+    
+    def _get_style_tags(self, style: str) -> List[str]:
+        """Get presentation style tags for adaptive template use"""
+        style_map = {
+            "academic": ["academic", "educational", "formal", "scholarly"],
+            "educational": ["educational", "academic", "teaching", "learning"],
+            "storytelling": ["storytelling", "narrative", "creative", "engaging"],
+            "business_pitch": ["business", "pitch", "professional", "corporate"],
+            "technical_briefing": ["technical", "detailed", "professional", "engineering"],
+            "general": ["general", "informative", "standard"],
+        }
+        base_tags = style_map.get(style.lower(), [style.lower()])
+        return list(set(base_tags))
+    
+    def _get_audience_tags(self, audience: str) -> List[str]:
+        """Get audience category tags for adaptive template use"""
+        audience_lower = audience.lower()
+        tags = []
+        if "grade" in audience_lower or "school" in audience_lower:
+            tags.extend(["school", "education", "students"])
+        if "college" in audience_lower or "university" in audience_lower:
+            tags.extend(["college", "higher-education", "adults"])
+        if "professional" in audience_lower or "business" in audience_lower:
+            tags.extend(["professional", "corporate", "adults"])
+        if not tags:
+            tags = [audience_lower]
+        return list(set(tags))
+    
+    def _store_slide_deck(self, prompt_id: str, slide_deck: SlideDeck, user_id: str, context: Optional[Dict] = None, analysis: Optional[Dict] = None) -> str:
+        """Store generated slide deck in database with category tags for adaptive template use"""
+        # Get analysis from context if not provided
+        if analysis is None:
+            analysis = {}
+        
         deck_doc = {
             "promptId": prompt_id,
             "title": slide_deck.title,
@@ -392,12 +545,26 @@ Return JSON:
             "key_points": [slide.key_points for slide in slide_deck.slides],
             "image_placeholders": [slide.images for slide in slide_deck.slides],
             "image_markers": slide_deck.image_markers,
+			"template_path": slide_deck.template_path,
+            "generated_notes": [slide.notes for slide in slide_deck.slides],
             "speaker_notes": [],  # Will be filled by SpeakerNotesAgent
-            "style": "default",  # Will be filled by TemplateSelectionAgent
+            "style": slide_deck.template_metadata.get("style", "default") if slide_deck.template_metadata else "default",
             "media_refs": [],  # Will be filled by MediaIntegrationAgent
             "diagram_refs": [],  # Will be filled by MediaIntegrationAgent
             "quiz_refs": [],  # Will be filled by QuizGenerationAgent
             "localized_versions": [],
+            # Category tags for adaptive template use
+            "categories": {
+                "subject": analysis.get("subject", "general"),
+                "subject_tags": self._get_subject_tags(analysis.get("subject", "general")),
+                "style": slide_deck.template_metadata.get("style", "educational") if slide_deck.template_metadata else "educational",
+                "style_tags": self._get_style_tags(slide_deck.template_metadata.get("style", "educational") if slide_deck.template_metadata else "educational"),
+                "audience": slide_deck.target_audience,
+                "audience_tags": self._get_audience_tags(slide_deck.target_audience),
+                "complexity": slide_deck.difficulty_level,
+                "topics": analysis.get("key_topics", []),
+            },
+            "template_metadata": slide_deck.template_metadata or {},
             "metadata": {
                 "total_slides": slide_deck.total_slides,
                 "estimated_duration": slide_deck.estimated_duration,

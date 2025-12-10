@@ -1,0 +1,15 @@
+// Boolean Logic – Common Use Cases: Conditional statements (if/else) execute code based on conditions.
+
+Decision-making systems automate processes with logical rules.
+
+Error handling manages unexpected situations with logical checks.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	process [label="Boolean Logic – Common Use Cases: Conditional stat"]
+	end [label=End]
+	start -> process
+	process -> end
+}

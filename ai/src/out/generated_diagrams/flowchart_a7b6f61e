@@ -1,0 +1,20 @@
+// The Products of Photosynthesis: The primary products of photosynthesis are sugar (glucose), which serves as the plant’s food source, providing energy for growth and metabolism. Oxygen is released as a byproduct of the process, contributing significantly to the atmosphere and making it breathable for many organisms.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	step2 [label="Step 2"]
+	step3 [label="Step 3"]
+	step4 [label="Step 4"]
+	step5 [label="Step 5"]
+	step6 [label="Step 6"]
+	step7 [label=End]
+	"" -> "" [label=Produces]
+	"" -> "" [label=Provides]
+	"" -> "" [label=Releases]
+	"" -> "" [label="Is a component of"]
+	"" -> "" [label="Contributes to"]
+	"" -> "" [label="Results in"]
+}

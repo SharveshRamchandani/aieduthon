@@ -46,6 +46,9 @@ func Routes(r *gin.Engine) {
 		c.JSON(http.StatusOK, gin.H{"logged_in": false})
 	})
 
+	r.GET("/login", handlers.Login)
+	r.POST("/signup", handlers.SignUp)
+
 	authorized := r.Group("/api")
 	authorized.Use(middleware.JWTMiddleWare())
 	{

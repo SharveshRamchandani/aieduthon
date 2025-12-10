@@ -1,0 +1,11 @@
+// What is Photosynthesis?: Photosynthesis is the remarkable process by which plants convert light energy into chemical energy, fueling their growth and survival. It’s the cornerstone of nearly all food chains on Earth, as plants are the primary producers, creating the base for countless organisms.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	process [label="What is Photosynthesis?: Photosynthesis is the rem"]
+	end [label=End]
+	start -> process
+	process -> end
+}

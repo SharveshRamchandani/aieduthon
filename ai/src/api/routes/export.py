@@ -3,8 +3,11 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from pathlib import Path
 import os
+import logging
 
 from exporters.ppt_exporter import PPTExporter
+
+logger = logging.getLogger(__name__)
 
 
 class ExportRequest(BaseModel):
@@ -44,14 +47,24 @@ def export_deck(deck_id: str, body: ExportRequest):
 				"Content-Length": str(len(file_bytes))
 			}
 		)
+	except ValueError as e:
+		# Invalid deck_id format (not a valid ObjectId)
+		logger.error(f"Invalid deck_id format for export: {deck_id}, error: {str(e)}")
+		raise HTTPException(status_code=400, detail=f"Invalid deck ID format: {str(e)}")
 	except FileNotFoundError as e:
+		# Deck not found in database
+		logger.error(f"Deck not found for export: {deck_id}, error: {str(e)}")
 		raise HTTPException(status_code=404, detail=str(e))
 	except RuntimeError as e:
+		logger.error(f"Runtime error during export for deck {deck_id}: {str(e)}")
 		raise HTTPException(status_code=500, detail=str(e))
 	except ImportError as e:
+		logger.error(f"Import error during PDF export for deck {deck_id}: {str(e)}")
 		raise HTTPException(status_code=500, detail=f"PDF conversion failed: {str(e)}")
 	except Exception as e:
-		raise HTTPException(status_code=400, detail=str(e))
+		# Catch-all for any other exceptions - log the full error for debugging
+		logger.error(f"Unexpected error during export for deck {deck_id}: {type(e).__name__}: {str(e)}", exc_info=True)
+		raise HTTPException(status_code=400, detail=f"Export failed: {type(e).__name__}: {str(e)}")
 
 
 @router.get("/{deck_id}/download")

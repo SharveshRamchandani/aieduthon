@@ -3,7 +3,7 @@
 
 models:
   text:
-    active_model: "gemma-3-1b-it"
+    active_model: "gemini-flash-lite-latest"
     provider: "gemini"  # Use Google Gemini API only
     use_api: true  # Use API by default
     available_models:

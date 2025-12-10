@@ -16,7 +16,7 @@ class AIConfig:
 	hf_api_key: str = os.getenv("HF_API_KEY", "")
 	hf_model_id: str = os.getenv("HF_MODEL_ID", "mistralai/Mistral-7B-Instruct-v0.2")
 	gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-	gemini_model_id: str = os.getenv("GEMINI_MODEL_ID", "gemma-3-1b-it")
+	gemini_model_id: str = os.getenv("GEMINI_MODEL_ID", "gemini-flash-lite-latest")
 	stability_api_key: str = os.getenv("STABILITY_API_KEY", "")
 	# Stock image API keys
 	unsplash_api_key: str = os.getenv("UNSPLASH_API_KEY", "")

@@ -1,0 +1,19 @@
+// 2. Shear Stress and Flow: Viscous Shear Stress: Due to intrinsic cohesive forces within fluids, shear stress acts tangentially between fluid layers. External Forces: Inflow or pressure differences induce extrinsic forces that influence flow dynamics.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label="Start: Shear Stress and Flow Concepts"]
+	viscousshear [label="Viscous Shear Stress Origin
+(Intrinsic Cohesive Forces within Fluid)"]
+	shearaction [label="Action: Shear Stress acts Tangentially Between Fluid Layers"]
+	externalforces [label="External Forces Influencing Flow Dynamics"]
+	externalexamples [label="Examples: Inflow or Pressure Differences"]
+	end [label=End]
+	start -> viscousshear [label="Introduce Viscous Shear"]
+	viscousshear -> shearaction [label="Leads to"]
+	start -> externalforces [label="Introduce External Influences"]
+	externalforces -> externalexamples [label="Resulting in"]
+	shearaction -> end [label="Fundamental Mechanism"]
+	externalexamples -> end [label="Driving Forces"]
+}

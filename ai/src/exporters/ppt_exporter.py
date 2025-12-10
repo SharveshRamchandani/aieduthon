@@ -54,21 +54,17 @@ class PPTExporter:
 		return ppt_bytes, fname
 	
 	def _export_to_pdf(self, deck_id: str, user_name: str = "user") -> Tuple[bytes, str]:
-		"""Convert PPTX to PDF using pure Python - reads PPTX and renders as PDF pages."""
-		try:
-			from reportlab.lib.pagesizes import letter, A4
-			from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-			from reportlab.lib.units import inch
-			from reportlab.lib import colors
-			from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Image as RLImage, KeepTogether
-			from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
-			from reportlab.pdfgen import canvas
-			from reportlab.lib.utils import ImageReader
-		except ImportError:
-			raise ImportError("reportlab is required for PDF export. Install with: pip install reportlab")
+		"""Convert PPTX to PDF preserving template and formatting.
 		
+		Uses LibreOffice headless mode to convert PPTX to PDF, which preserves
+		all templates, formatting, colors, fonts, images, and layout exactly as in PPTX.
+		Falls back to reportlab if LibreOffice is not available (but warns about loss of formatting).
+		"""
 		import re
 		import tempfile
+		import subprocess
+		import shutil
+		import platform
 		
 		try:
 			object_id = ObjectId(deck_id)
@@ -84,11 +80,116 @@ class PPTExporter:
 		# Generate PPTX first (in memory)
 		prs, pptx_filename = self._build_presentation(deck_id, user_name)
 		
+		# Generate filename: Topic_user_date.pdf
+		safe_title = re.sub(r'[^\w\s-]', '', title)[:50].strip().replace(' ', '_')
+		if not safe_title:
+			safe_title = "Presentation"
+		
+		safe_user = re.sub(r'[^\w\s-]', '', user_name)[:30].strip().replace(' ', '_')
+		if not safe_user:
+			safe_user = "user"
+		
+		date_str = datetime.utcnow().strftime('%Y-%m-%d')
+		filename = f"{safe_title}_{safe_user}_{date_str}.pdf"
+		
+		# Try LibreOffice conversion first (preserves template and formatting)
+		try:
+			return self._convert_pptx_to_pdf_libreoffice(prs, filename)
+		except Exception as libreoffice_error:
+			logger.warning(f"LibreOffice conversion failed: {libreoffice_error}. Falling back to reportlab (template/formatting may be lost).")
+			# Fallback to reportlab (loses template but at least produces PDF)
+			return self._convert_pptx_to_pdf_reportlab(prs, title, user_name, filename)
+	
+	def _convert_pptx_to_pdf_libreoffice(self, prs: Presentation, filename: str) -> Tuple[bytes, str]:
+		"""Convert PPTX to PDF using LibreOffice headless mode - preserves all formatting."""
+		import tempfile
+		import subprocess
+		import shutil
+		import platform
+		
+		# Check if LibreOffice is available
+		if platform.system() == "Windows":
+			# Common LibreOffice paths on Windows
+			libreoffice_paths = [
+				r"C:\Program Files\LibreOffice\program\soffice.exe",
+				r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+			]
+			soffice = None
+			for path in libreoffice_paths:
+				if Path(path).exists():
+					soffice = path
+					break
+			if not soffice:
+				# Try to find in PATH
+				soffice = shutil.which("soffice")
+		else:
+			# Linux/Mac - try to find in PATH
+			soffice = shutil.which("soffice") or shutil.which("libreoffice")
+		
+		if not soffice:
+			raise RuntimeError("LibreOffice not found. Install LibreOffice for PDF export with template preservation.")
+		
+		# Save PPTX to temporary file
+		with tempfile.TemporaryDirectory() as temp_dir:
+			pptx_path = Path(temp_dir) / "presentation.pptx"
+			pdf_path = Path(temp_dir) / "presentation.pdf"
+			
+			# Save PPTX
+			prs.save(str(pptx_path))
+			
+			# Convert using LibreOffice headless mode
+			# --headless: Run without GUI
+			# --convert-to pdf: Convert to PDF
+			# --outdir: Output directory
+			cmd = [
+				soffice,
+				"--headless",
+				"--convert-to", "pdf",
+				"--outdir", str(temp_dir),
+				str(pptx_path)
+			]
+			
+			try:
+				result = subprocess.run(
+					cmd,
+					capture_output=True,
+					text=True,
+					timeout=60,  # 60 second timeout
+					check=True
+				)
+			except subprocess.TimeoutExpired:
+				raise RuntimeError("LibreOffice conversion timed out")
+			except subprocess.CalledProcessError as e:
+				raise RuntimeError(f"LibreOffice conversion failed: {e.stderr}")
+			
+			# Check if PDF was created
+			if not pdf_path.exists():
+				raise RuntimeError("LibreOffice did not produce PDF file")
+			
+			# Read PDF bytes
+			with open(pdf_path, 'rb') as f:
+				pdf_bytes = f.read()
+			
+			return pdf_bytes, filename
+	
+	def _convert_pptx_to_pdf_reportlab(self, prs: Presentation, title: str, user_name: str, filename: str) -> Tuple[bytes, str]:
+		"""Fallback PDF conversion using reportlab - loses template but produces PDF."""
+		try:
+			from reportlab.lib.pagesizes import letter, A4
+			from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+			from reportlab.lib.units import inch
+			from reportlab.lib import colors
+			from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Image as RLImage
+			from reportlab.lib.enums import TA_CENTER, TA_LEFT
+		except ImportError:
+			raise ImportError("reportlab is required for PDF export fallback. Install with: pip install reportlab")
+		
+		import tempfile
+		
 		# Create PDF buffer
 		pdf_buffer = BytesIO()
 		
 		# Use letter size (8.5 x 11 inches) for slides
-		# Slide aspect ratio is typically 16:9, but we'll use letter for compatibility
 		doc = SimpleDocTemplate(
 			pdf_buffer,
 			pagesize=letter,
@@ -101,16 +202,6 @@ class PPTExporter:
 		styles = getSampleStyleSheet()
 		
 		# Custom styles for slides
-		title_style = ParagraphStyle(
-			'SlideTitle',
-			parent=styles['Heading1'],
-			fontSize=32,
-			textColor=colors.HexColor('#1a1a1a'),
-			spaceAfter=20,
-			alignment=TA_CENTER,
-			fontName='Helvetica-Bold'
-		)
-		
 		slide_title_style = ParagraphStyle(
 			'SlideHeading',
 			parent=styles['Heading2'],
@@ -132,6 +223,7 @@ class PPTExporter:
 		)
 		
 		story = []
+		temp_image_files = []  # Keep track of temp files to clean up after PDF is built
 		
 		# Process each slide
 		for slide_idx, slide in enumerate(prs.slides):
@@ -167,7 +259,9 @@ class PPTExporter:
 						# Save to temp file for reportlab
 						with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_img:
 							tmp_img.write(image_bytes)
-							images.append((tmp_img.name, shape))
+							img_path = tmp_img.name
+							temp_image_files.append(img_path)  # Track for cleanup
+							images.append((img_path, shape))
 					except Exception as e:
 						logger.debug(f"Failed to extract image from slide {slide_idx}: {e}")
 			
@@ -226,32 +320,23 @@ class PPTExporter:
 					story.append(Spacer(1, 0.2*inch))
 				except Exception as e:
 					logger.debug(f"Failed to add image to PDF: {e}")
-				finally:
-					# Clean up temp image file
-					try:
-						Path(img_path).unlink()
-					except:
-						pass
 			
 			# Add page break after each slide (except last)
 			if slide_idx < len(prs.slides) - 1:
 				story.append(PageBreak())
 		
-		# Build PDF
-		doc.build(story)
-		pdf_bytes = pdf_buffer.getvalue()
-		
-		# Generate filename: Topic_user_date.pdf
-		safe_title = re.sub(r'[^\w\s-]', '', title)[:50].strip().replace(' ', '_')
-		if not safe_title:
-			safe_title = "Presentation"
-		
-		safe_user = re.sub(r'[^\w\s-]', '', user_name)[:30].strip().replace(' ', '_')
-		if not safe_user:
-			safe_user = "user"
-		
-		date_str = datetime.utcnow().strftime('%Y-%m-%d')
-		filename = f"{safe_title}_{safe_user}_{date_str}.pdf"
+		# Build PDF (this is when ReportLab reads the image files)
+		try:
+			doc.build(story)
+			pdf_bytes = pdf_buffer.getvalue()
+		finally:
+			# Clean up temp image files AFTER PDF is built
+			for img_path in temp_image_files:
+				try:
+					if Path(img_path).exists():
+						Path(img_path).unlink()
+				except Exception as e:
+					logger.debug(f"Failed to delete temp image file {img_path}: {e}")
 		
 		return pdf_bytes, filename
 	

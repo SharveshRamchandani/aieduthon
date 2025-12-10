@@ -1,0 +1,11 @@
+// 9. Viscous Fluid Behavior: Viscous Oils: Ideal for processes requiring low resistance. Thickening Media: Latex paints serve as non-Newtonian fluids for flooring and painting.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	A [label="Viscous Fluid Behavior"]
+	B [label="Viscous Oils"]
+	C [label="Thickening Media"]
+	A -> B [label="Example 1"]
+	A -> C [label="Example 2"]
+}

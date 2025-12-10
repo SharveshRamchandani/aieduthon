@@ -56,6 +56,7 @@ export interface OrchestrateRequest {
   locale?: string;
   context?: Record<string, any>;
   quiz_type?: string;
+  quiz_questions?: number;
   audience_level?: string;
   presentation_style?: string;
   generate_images?: boolean;
@@ -146,6 +147,7 @@ export async function orchestrate(request: OrchestrateRequest): Promise<Orchestr
       ...request,
       locale: request.locale || 'en',
       quiz_type: request.quiz_type || 'comprehensive',
+      quiz_questions: request.quiz_questions,
       presentation_style: request.presentation_style || 'educational',
       generate_images: request.generate_images ?? true,
       generate_diagrams: request.generate_diagrams ?? true,
@@ -280,9 +282,12 @@ export async function generateQuiz(
   deckId: string,
   userId: string,
   quizType?: string,
-  difficulty?: string
-): Promise<{ success: boolean; quiz_ids: string[] }> {
-  const response = await fetch(`${API_BASE_URL}/slides/${deckId}/quizzes`, {
+  difficulty?: string,
+  downloadFormat: 'json' | 'pdf' = 'json'
+): Promise<{ success: boolean; quiz_ids: string[] } | void> {
+  const url = `${API_BASE_URL}/slides/${deckId}/quizzes${downloadFormat === 'pdf' ? '?download=pdf' : ''}`;
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -295,6 +300,26 @@ export async function generateQuiz(
   if (!response.ok) {
     const error = await response.text();
     throw new Error(error || 'Failed to generate quiz');
+  }
+
+  // If PDF requested, trigger download in browser
+  if (downloadFormat === 'pdf') {
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = 'quiz.pdf';
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?(.+?)"?$/i);
+      if (match) filename = match[1];
+    }
+    const urlObject = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = urlObject;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(urlObject);
+    document.body.removeChild(a);
+    return;
   }
 
   return response.json();

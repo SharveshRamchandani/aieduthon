@@ -1,0 +1,11 @@
+// The Equation: The fundamental equation governing this relationship is: k = A * T, where 'k' represents the rate of reaction, 'A' is a constant, and 'T' is the temperature in Kelvin. The rate of reaction, 'k', is a measure of how quickly reactants are converted into products, directly proportional to the temperature.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1 [label="Reaction Rate (k)"]
+	step1 -> step2 [label="Formula: k = A * T"]
+	step2 -> end [label="Conclusion: Temperature (T) directly affects the rate of reaction (k)."]
+}

@@ -4,7 +4,6 @@ import * as React from "react"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X, Moon, Sun, LogOut, User, Home, Sparkles } from 'lucide-react';
-import { Menu, X, Moon, Sun, LogOut, User, Home, Sparkles } from "lucide-react"
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -116,15 +115,6 @@ const TopBar = () => {
                 </Button>
               </>
             )}
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="rounded-full"
-            >
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
           </motion.div>
           
           {user ? (

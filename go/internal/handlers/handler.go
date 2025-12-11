@@ -206,5 +206,6 @@ func SignUp(c *gin.Context){
 
 	logger.Log.Debug("Login URL: " + loginURL)
 	logger.Log.Debug("User SignedUp successfully", zap.String("User: ", signup.Name), zap.String("Email: ", signup.Email))
+	c.JSON(http.StatusAccepted, gin.H{"message" : "SignUp Successfull"})
 	c.Redirect(http.StatusSeeOther, loginURL)
 }

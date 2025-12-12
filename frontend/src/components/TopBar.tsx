@@ -269,15 +269,6 @@ const TopBar = () => {
                 </Button>
               </>
             )}
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="rounded-full"
-            >
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
           </motion.div>
           
           {user ? (

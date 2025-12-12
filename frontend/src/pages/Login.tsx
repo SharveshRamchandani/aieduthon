@@ -35,9 +35,7 @@ export default function Login() {
   };
 
   const handleGoogleLogin = () => {
-    console.log("Google login");
-    //todo: remove mock functionality
-    alert("Google login will be implemented");
+    
   };
 
   return (

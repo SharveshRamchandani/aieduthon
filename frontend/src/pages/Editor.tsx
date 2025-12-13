@@ -496,7 +496,6 @@ const Editor = () => {
         isExporting={isExporting}
       />
     </div>
-    </div>
   );
 };
 

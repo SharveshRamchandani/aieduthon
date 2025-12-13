@@ -129,7 +129,6 @@ except Exception as e:
 - Add horizontal scaling support
 - Consider model serving infrastructure
 
----
 
 ### 6. User Experience: **8.5/10** ⭐⭐⭐⭐
 

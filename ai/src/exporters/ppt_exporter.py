@@ -1,7 +1,7 @@
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 import logging
 import base64
 
@@ -10,6 +10,7 @@ from bson.objectid import ObjectId
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
+from PIL import Image
 
 from ai_db import get_ai_db
 
@@ -20,6 +21,110 @@ class PPTExporter:
 	def __init__(self):
 		self.db = get_ai_db()
 		self.slides_collection = self.db["slides"]
+	
+	def _calculate_available_space_for_image(self, slide, text_frame) -> Dict[str, float]:
+		"""
+		Calculate available space on slide for image placement based on text content.
+		
+		Args:
+			slide: PowerPoint slide object
+			text_frame: Text frame object containing slide content
+			
+		Returns:
+			Dict with available space dimensions
+		"""
+		# Standard slide dimensions (10x7.5 inches for 16:9)
+		SLIDE_WIDTH = 10.0
+		SLIDE_HEIGHT = 7.5
+		MARGIN = 0.5
+		
+		# Estimate content area from text frame position
+		try:
+			# Get parent shape to access position
+			parent_shape = text_frame._parent  # Access parent shape
+			text_left = parent_shape.left / 914400.0  # Convert EMU to inches
+			text_top = parent_shape.top / 914400.0
+			text_width = parent_shape.width / 914400.0
+			text_height = parent_shape.height / 914400.0
+		except Exception:
+			# Fallback: estimate content area
+			text_left = 1.0
+			text_top = 1.5
+			text_width = 5.5
+			text_height = 5.5
+		
+		# Calculate available space for image (right side)
+		available_left = text_left + text_width + 0.2
+		available_top = text_top
+		available_width = SLIDE_WIDTH - available_left - MARGIN
+		available_height = SLIDE_HEIGHT - available_top - MARGIN
+		
+		return {
+			"left": max(MARGIN, available_left),
+			"top": max(MARGIN, available_top),
+			"width": max(2.0, available_width),  # Minimum 2 inches
+			"height": max(2.0, available_height),  # Minimum 2 inches
+		}
+	
+	def _calculate_optimal_image_size(
+		self,
+		image_path: str,
+		available_space: Dict[str, float],
+		max_size_ratio: float = 0.85,
+		min_size_ratio: float = 0.4
+	) -> Dict[str, float]:
+		"""
+		Calculate optimal image size based on available space and image dimensions.
+		
+		Args:
+			image_path: Path to image file
+			available_space: Dict with available space dimensions
+			max_size_ratio: Maximum ratio of available space to use (0.0-1.0)
+			min_size_ratio: Minimum ratio of available space to use (0.0-1.0)
+			
+		Returns:
+			Dict with optimal width, height, left, top positions
+		"""
+		try:
+			with Image.open(image_path) as image:
+				img_width_px, img_height_px = image.size
+				img_ratio = img_width_px / img_height_px if img_height_px > 0 else 1.0
+		except Exception:
+			# Fallback if image can't be opened
+			img_ratio = 1.0
+		
+		avail_w = available_space["width"]
+		avail_h = available_space["height"]
+		avail_ratio = avail_w / avail_h if avail_h > 0 else 1.0
+		
+		# Calculate optimal size maintaining aspect ratio
+		if img_ratio > avail_ratio:
+			# Image is wider than available space
+			optimal_width = avail_w * max_size_ratio
+			optimal_height = optimal_width / img_ratio
+			# Ensure minimum size
+			if optimal_height < avail_h * min_size_ratio:
+				optimal_height = avail_h * min_size_ratio
+				optimal_width = optimal_height * img_ratio
+		else:
+			# Image is taller than available space
+			optimal_height = avail_h * max_size_ratio
+			optimal_width = optimal_height * img_ratio
+			# Ensure minimum size
+			if optimal_width < avail_w * min_size_ratio:
+				optimal_width = avail_w * min_size_ratio
+				optimal_height = optimal_width / img_ratio
+		
+		# Center the image in available space
+		left = available_space["left"] + (avail_w - optimal_width) / 2
+		top = available_space["top"] + (avail_h - optimal_height) / 2
+		
+		return {
+			"left": max(available_space["left"], left),
+			"top": max(available_space["top"], top),
+			"width": min(optimal_width, avail_w),
+			"height": min(optimal_height, avail_h)
+		}
 
 	def export_deck(self, deck_id: str, output_dir: str = "..\\..\\out", user_name: str = "user") -> str:
 		"""Export slide deck to disk (legacy behavior)."""
@@ -491,23 +596,31 @@ class PPTExporter:
 						response = requests.get(url, timeout=15)
 						response.raise_for_status()
 						img_bytes = response.content
-						# Basic right-side placement; template-specific tuning can be
-						# added later if needed.
-						left = Inches(6.0)
-						top = Inches(2.0)
-						width = Inches(3.0)
 						tmp_path = Path("_ppt_tmp_image.png")
 						tmp_path.write_bytes(img_bytes)
 						try:
-							slide.shapes.add_picture(str(tmp_path), left, top, width=width)
+							# Calculate available space dynamically based on text content
+							available_space = self._calculate_available_space_for_image(slide, text_frame)
+							# Calculate optimal image size
+							optimal_size = self._calculate_optimal_image_size(str(tmp_path), available_space)
+							
+							# Add image with dynamically calculated size
+							slide.shapes.add_picture(
+								str(tmp_path),
+								Inches(optimal_size["left"]),
+								Inches(optimal_size["top"]),
+								width=Inches(optimal_size["width"]),
+								height=Inches(optimal_size["height"])
+							)
 						finally:
 							try:
 								tmp_path.unlink()
 							except OSError:
 								# Non-fatal if temp cleanup fails.
 								pass
-					except Exception:
+					except Exception as e:
 						# If image download or placement fails, continue without blocking export.
+						logger.debug(f"Failed to add image to slide {idx}: {e}")
 						pass
 
 			# Speaker notes priority

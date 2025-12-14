@@ -1,13 +1,20 @@
 package mongodb
 
-import "time"
+import (
+	"time"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+// Job represents background jobs and their status
 type Job struct {
-    JobID       string    `bson:"_id,omitempty" json:"jobId"`
-    ServiceType string    `bson:"serviceType" json:"serviceType"`
-    Status      string    `bson:"status" json:"status"`
-    ResultURL   string    `bson:"resultUrl" json:"resultUrl"`
-    Error       string    `bson:"error,omitempty" json:"error"`
-    CreatedAt   time.Time `bson:"createdAt" json:"createdAt"`
-    CompletedAt time.Time `bson:"completedAt,omitempty" json:"completedAt"`
+	ID          primitive.ObjectID     `bson:"_id,omitempty" json:"id"`
+	JobID       string                 `bson:"jobId" json:"jobId"` // UNIQUE
+	ServiceType string                 `bson:"service_type" json:"service_type"`
+	Status      string                 `bson:"status" json:"status"` // "pending" | "processing" | "completed" | "failed"
+	Timestamp   time.Time              `bson:"timestamp" json:"timestamp"`
+	Input       map[string]interface{} `bson:"input" json:"input"`
+	Output      map[string]interface{} `bson:"output,omitempty" json:"output,omitempty"`
+	Error       string                 `bson:"error,omitempty" json:"error,omitempty"`
+	Metadata    map[string]interface{} `bson:"metadata,omitempty" json:"metadata,omitempty"`
 }

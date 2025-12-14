@@ -38,7 +38,7 @@ func Routes(r *gin.Engine) {
 	r.GET("/auth/status", handlers.AuthStatus)
 
 	r.GET("/auth/logout", handlers.Logout)
-	r.GET("/login", handlers.Login)
+	r.POST("/login", handlers.Login)
 	r.POST("/signup", handlers.SignUp)
 
 	authorized := r.Group("/api")

@@ -17,9 +17,9 @@ const TopBar = () => {
 
   const toggleMenu = () => setIsOpen(!isOpen)
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+  const handleLogout = async() => {
+    await logout();
+    // navigate('/');
   };
 
   return (

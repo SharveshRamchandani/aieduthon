@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"net/http"
+
 	"github.com/gorilla/sessions"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/providers/google"
@@ -29,9 +31,10 @@ func InitStore(key string) {
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
 		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
 	}
 
-	logger.Log.Debug("auth: InitStore: info: session store initialized; HttpOnly=true, Secure=false")
+	logger.Log.Debug("auth: InitStore: info: session store initialized; HttpOnly=true, Secure=false, SameSite=Lax")
 }
 
 // SetUpgoth registers OAuth providers with goth and wires up the session store.

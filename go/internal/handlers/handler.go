@@ -16,6 +16,7 @@ import (
 	"github.com/SharveshRamchandani/aieduthon.git/internal/modals/login"
 	mongodb "github.com/SharveshRamchandani/aieduthon.git/internal/modals/mongoDB"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/markbates/goth/gothic"
 	"go.uber.org/zap"
 )
@@ -79,20 +80,21 @@ func GoogleCallBackFunction(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie(
-		"jwt",
-		JwtToken,
-		86400, // 24 hours in seconds
-		"/",
-		"",
-		false,
-		true,
-	)
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "jwt",
+		Value:    JwtToken,
+		Path:     "/",
+		MaxAge:   86400, // 24 hours in seconds
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
 
 	logger.Log.Info("Frontend URL loaded", zap.String("url", frontendURL))
 
 	redirect := fmt.Sprintf("%shome", frontendURL)
-	c.Redirect(http.StatusSeeOther, redirect)
+	logger.Log.Info("Frontend HOME page URL loaded", zap.String("url", redirect))
+	c.Redirect(http.StatusFound, redirect)
 }
 
 func Login(c *gin.Context) {
@@ -141,15 +143,15 @@ func Login(c *gin.Context) {
 
 	update.UpdateLoginTime(Login)
 
-	c.SetCookie(
-		"jwt",
-		JWTToken,
-		86400, // 24 hours in seconds
-		"/",
-		"",
-		false,
-		true,
-	)
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "jwt",
+		Value:    JWTToken,
+		Path:     "/",
+		MaxAge:   86400, // 24 hours in seconds
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
 
 	logger.Log.Debug("User successfully logged in", zap.String("User : ", exists.UserName))
 	c.JSON(http.StatusAccepted, gin.H{"Message": "Successfully LoggedIn"})
@@ -200,4 +202,64 @@ func SignUp(c *gin.Context) {
 	logger.Log.Debug("User SignedUp successfully", zap.String("User: ", signup.Name), zap.String("Email: ", signup.Email))
 	c.JSON(http.StatusAccepted, gin.H{"message": "SignUp Successfull"})
 	c.Redirect(http.StatusSeeOther, loginURL)
+}
+
+func Logout(c *gin.Context) {
+	// Clear all cookies with proper SameSite attribute
+	cookiesToClear := []string{"jwt", "Auth", "session", "_gothic_session"}
+
+	for _, cookieName := range cookiesToClear {
+		http.SetCookie(c.Writer, &http.Cookie{
+			Name:     cookieName,
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			Secure:   false,
+			SameSite: http.SameSiteLaxMode,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+func AuthStatus(c *gin.Context) {
+	// Check for jwt cookie which is set after successful OAuth login
+	token, err := c.Cookie("jwt")
+	if err != nil || token == "" {
+		c.JSON(http.StatusOK, gin.H{"logged_in": false})
+		return
+	}
+
+	// Decode JWT to get user info
+	parse, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return JwtKey, nil
+	})
+
+	if err != nil || !parse.Valid {
+		c.JSON(http.StatusOK, gin.H{"logged_in": false})
+		return
+	}
+
+	claims, ok := parse.Claims.(jwt.MapClaims)
+	if !ok {
+		c.JSON(http.StatusOK, gin.H{"logged_in": false})
+		return
+	}
+
+	// Extract user info from claims
+	email, _ := claims["email"].(string)
+	name, _ := claims["name"].(string)
+	if name == "" {
+		name, _ = claims["Name"].(string) // Handle case where it's "Name" instead of "name"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"logged_in": true,
+		"email":     email,
+		"name":      name,
+	})
 }

@@ -4,8 +4,10 @@ from pydantic import BaseModel
 from pathlib import Path
 import os
 import logging
+import base64
 
 from exporters.ppt_exporter import PPTExporter
+from ai_db import get_ai_db
 
 logger = logging.getLogger(__name__)
 
@@ -73,27 +75,53 @@ def download_deck(deck_id: str):
 	try:
 		from bson.objectid import ObjectId
 		object_id = ObjectId(deck_id)
-		
-		# Find the file in the output directory
+
+		# 1) Try to serve directly from DB (preferred)
+		db = get_ai_db()
+		slides = db["slides"]
+		doc = slides.find_one({"_id": object_id}, {"ppt_file": 1, "ppt_filename": 1})
+		if doc and doc.get("ppt_file"):
+			try:
+				ppt_bytes = base64.b64decode(doc["ppt_file"])
+				filename = doc.get("ppt_filename") or f"deck_{str(object_id)}.pptx"
+				return Response(
+					content=ppt_bytes,
+					media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+					headers={
+						"Content-Disposition": f'attachment; filename="{filename}"',
+						"Content-Length": str(len(ppt_bytes))
+					}
+				)
+			except Exception as decode_err:
+				logger.error(f"Failed to decode PPT from DB for deck {deck_id}: {decode_err}")
+				# Fall through to regeneration
+
+		# 2) Regenerate and persist to DB if missing
+		exporter = PPTExporter()
+		ppt_bytes, filename = exporter.export_deck_to_bytes(deck_id, save_to_db=True)
+		if ppt_bytes:
+			return Response(
+				content=ppt_bytes,
+				media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+				headers={
+					"Content-Disposition": f'attachment; filename="{filename}"',
+					"Content-Length": str(len(ppt_bytes))
+				}
+			)
+
+		# 3) Final fallback to legacy filesystem path (backward compatibility)
 		out_dir = Path(__file__).parent.parent.parent / "out"
 		filename = f"deck_{str(object_id)}.pptx"
 		file_path = out_dir / filename
-		
-		if not file_path.exists():
-			# Try to export it first
-			exporter = PPTExporter()
-			export_path = exporter.export_deck(deck_id, str(out_dir))
-			file_path = Path(export_path)
-		
-		if not file_path.exists():
-			raise HTTPException(status_code=404, detail="Deck file not found. Please export first.")
-		
-		return FileResponse(
-			path=str(file_path),
-			media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-			filename=filename,
-			headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-		)
+		if file_path.exists():
+			return FileResponse(
+				path=str(file_path),
+				media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+				filename=filename,
+				headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+			)
+
+		raise HTTPException(status_code=404, detail="Deck file not found. Please export first.")
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
 

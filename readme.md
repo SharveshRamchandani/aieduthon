@@ -27,7 +27,7 @@ Go Authentication Service
 
 React TypeScript Application (Port 5173)
 - Modern web interface built with React and TypeScript
-- Uses shadcn-ui components and Tailwind CSS
+- Uses shadcn-ui components and Tailwind CSS 
 - Provides intuitive UI for creating and editing presentations
 - Supports real-time preview and editing
 

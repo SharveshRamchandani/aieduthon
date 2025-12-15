@@ -33,7 +33,11 @@ const Signup = () => {
 
     try {
       await signup(name, email, password);
-      navigate('/home');
+      toast({
+        title: 'Success',
+        description: 'Account created successfully! Please log in.',
+      });
+      navigate('/login');
     } catch (error) {
       toast({
         title: 'Error',

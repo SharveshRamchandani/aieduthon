@@ -1,88 +1,132 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 interface User {
   email: string;
-  name: string;
+  name?: string;
 }
 
 interface AuthContextType {
   user: User | null;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
-  isLoading: boolean;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const BACKEND_URL = "http://localhost:6001";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // 🔍 Check login status on page load
   useEffect(() => {
-    // Initialize default test user if no users exist
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    if (users.length === 0) {
-      const defaultUser = {
-        name: 'Test User',
-        email: 'test@example.com',
-        password: 'password123'
-      };
-      localStorage.setItem('users', JSON.stringify([defaultUser]));
-    }
-    
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    const checkAuth = async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/auth/status`, {
+          credentials: "include",
+        });
+
+        if (!res.ok) {
+          setUser(null);
+          return;
+        }
+
+        const data = await res.json();
+        // If logged in, set user object with email and name from JWT
+        if (data.logged_in === true && data.email) {
+          setUser({ 
+            email: data.email,
+            name: data.name || undefined
+          });
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const foundUser = users.find((u: any) => u.email === email && u.password === password);
-    
-    if (!foundUser) {
-      throw new Error('Invalid email or password');
+    const res = await fetch(`${BACKEND_URL}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.Error || "Login failed");
     }
 
-    const userData = { email: foundUser.email, name: foundUser.name };
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
+    // After successful login, check auth status to get user info
+    const statusRes = await fetch(`${BACKEND_URL}/auth/status`, {
+      credentials: "include",
+    });
+
+    if (statusRes.ok) {
+      const data = await statusRes.json();
+      if (data.logged_in === true && data.email) {
+        setUser({
+          email: data.email,
+          name: data.name || undefined,
+        });
+      }
+    }
   };
 
   const signup = async (name: string, email: string, password: string) => {
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    
-    if (users.find((u: any) => u.email === email)) {
-      throw new Error('Email already exists');
+    const res = await fetch(`${BACKEND_URL}/signup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ name, email, password }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || "Signup failed");
     }
 
-    const newUser = { name, email, password };
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
-
-    const userData = { email, name };
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
+    // Note: The backend SignUp handler doesn't set a JWT cookie,
+    // so the user needs to log in after signup
+    // We don't set the user here since they're not logged in yet
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch(`${BACKEND_URL}/auth/logout`, {
+        method: "GET", 
+        credentials: "include", 
+      });
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
     setUser(null);
-    localStorage.removeItem('user');
+    window.location.href = "/login";
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 };

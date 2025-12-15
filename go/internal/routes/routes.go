@@ -26,7 +26,7 @@ func Routes(r *gin.Engine) {
 
 		gothic.BeginAuthHandler(c.Writer, c.Request)
 	})
-	
+
 	r.GET("/auth/:provider/callback", func(c *gin.Context) {
 		provider := c.Param("provider")
 		q := c.Request.URL.Query()
@@ -35,16 +35,10 @@ func Routes(r *gin.Engine) {
 		handlers.GoogleCallBackFunction(c)
 	})
 
-	r.GET("/auth/status", func(c *gin.Context) {
-		token, err := c.Cookie("_gothic_session")
-		if err == nil && token != "" {
-			c.JSON(http.StatusOK, gin.H{"logged_in": true})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"logged_in": false})
-	})
+	r.GET("/auth/status", handlers.AuthStatus)
 
-	r.GET("/login", handlers.Login)
+	r.GET("/auth/logout", handlers.Logout)
+	r.POST("/login", handlers.Login)
 	r.POST("/signup", handlers.SignUp)
 
 	authorized := r.Group("/api")

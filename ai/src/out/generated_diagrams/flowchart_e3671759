@@ -1,0 +1,15 @@
+// 7. Physiological Impact: Blood Viscosity: Influences blood flow, energy expenditure, and vessel thickness. Dopant Effects: Adjusts viscosity of dopant fluids to enhance or reduce product performance in semiconductors.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label="Blood Viscosity"]
+	physimpact [label="Physiological Impact"]
+	physconsequences [label="Influences Blood Flow, Energy Expenditure, Vessel Thickness"]
+	dopanteffects [label="Dopant Effects (Semiconductors)"]
+	dopantconsequences [label="Adjusts Viscosity of Dopant Fluids to Enhance/Reduce Product Performance"]
+	start -> physimpact [label="Relates to"]
+	physimpact -> physconsequences [label="Results in"]
+	start -> dopanteffects [label="Also Influences"]
+	dopanteffects -> dopantconsequences [label=Purpose]
+}

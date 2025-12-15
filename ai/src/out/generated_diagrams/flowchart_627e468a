@@ -1,0 +1,21 @@
+// 5. Practical Measurement Techniques: Capillary Viscometers: Measure low-viscous fluids by observing flow rates. Rotational Viscometers: Determine high-viscous fluids using torque and angular velocity measurements.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	A [label="Practical Measurement Techniques"]
+	B [label="Fluid Viscosity Assessment"]
+	C [label="Low-Viscous Fluids"]
+	D [label="High-Viscous Fluids"]
+	E [label="Use Capillary Viscometers"]
+	F [label="Measure by observing flow rates"]
+	G [label="Use Rotational Viscometers"]
+	H [label="Determine using torque and angular velocity measurements"]
+	A -> B [label=Involves]
+	B -> C [label="If Fluid is..."]
+	B -> D [label="If Fluid is..."]
+	C -> E [label="Select Method"]
+	E -> F [label=Principle]
+	D -> G [label="Select Method"]
+	G -> H [label=Principle]
+}

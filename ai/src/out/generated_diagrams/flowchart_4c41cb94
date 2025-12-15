@@ -1,0 +1,19 @@
+// 3. Newton's Law of Viscosity: Linear Relationship: Newton's law $\tau = \mu \frac{du}{dy}$ applies to Newtonian fluids, where viscosity is constant under specific conditions. Non-Newtonian Behavior: Examples include cornstarch pastes (non-Newtonian) and latex paints (another non-Newtonian), differing in how they respond to shear stress.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	A [label="Newton's Law of Viscosity: $\tau = \mu \frac{du}{dy}$"]
+	B [label="Applies to Newtonian Fluids"]
+	C [label="Viscosity ($\mu$) is Constant (Under Specific Conditions)"]
+	D [label="Non-Newtonian Behavior"]
+	E [label="Fluid Response to Shear Stress Differs from Newtonian"]
+	F1 [label="Example: Cornstarch Pastes"]
+	F2 [label="Example: Latex Paints"]
+	A -> B [label="Defines Relationship for"]
+	B -> C [label="Characterized by"]
+	A -> D [label="Contrast with"]
+	D -> E [label="Key Feature"]
+	E -> F1 [label="Exemplified by"]
+	E -> F2 [label="Exemplified by"]
+}

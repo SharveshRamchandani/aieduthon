@@ -1,0 +1,15 @@
+// The Fundamental Building Block: Deconstructing Artificial Neural Networks (ANNs): Artificial Neural Networks are fundamentally constructed from numerous interconnected processing units, commonly referred to as artificial neurons or nodes. The strength and influence of the signal transmitted between any two connected neurons are quantified precisely by an associated numerical weight parameter.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	A [label="Artificial Neural Network (ANN)"]
+	B [label="Composed of numerous interconnected Processing Units (Artificial Neurons/Nodes)"]
+	C [label="Connection Exists Between Neurons"]
+	D [label="Associated Numerical Weight Parameter"]
+	E [label="Weight Quantifies Signal Strength/Influence"]
+	A -> B [label="Fundamentally Constructed From"]
+	B -> C [label="Results In"]
+	C -> D [label="Has an"]
+	D -> E [label=Which]
+}

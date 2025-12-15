@@ -52,7 +52,8 @@ class QuizGenerationAgent:
 				 deck_id: str, 
 				 user_id: str,
 				 quiz_type: str = "comprehensive",
-				 difficulty: Optional[str] = None) -> Dict[str, Any]:
+				 difficulty: Optional[str] = None,
+				 num_questions: Optional[int] = None) -> Dict[str, Any]:
 		"""
 		Generate quiz from slide deck
 		
@@ -76,11 +77,11 @@ class QuizGenerationAgent:
 			
 			# Generate quiz based on type
 			if quiz_type == "per_topic":
-				quizzes = self._generate_per_topic_quizzes(deck, content_analysis, difficulty)
+				quizzes = self._generate_per_topic_quizzes(deck, content_analysis, difficulty, num_questions)
 			elif quiz_type == "final_only":
-				quizzes = [self._generate_final_quiz(deck, content_analysis, difficulty)]
+				quizzes = [self._generate_final_quiz(deck, content_analysis, difficulty, num_questions)]
 			else:  # comprehensive
-				quizzes = [self._generate_comprehensive_quiz(deck, content_analysis, difficulty)]
+				quizzes = [self._generate_comprehensive_quiz(deck, content_analysis, difficulty, num_questions)]
 			
 			# Store quizzes
 			quiz_ids = []
@@ -125,27 +126,61 @@ class QuizGenerationAgent:
 		return self.slides_collection.find_one({"_id": object_id})
 	
 	def _analyze_slide_content(self, deck: Dict) -> Dict[str, Any]:
-		"""Analyze slide content to extract quiz-worthy concepts"""
+		"""Analyze slide content to extract quiz-worthy concepts from final PPT content"""
 		sections = deck.get("sections", [])
 		bullets = deck.get("bullets", [])
 		
-		# Extract key concepts from bullets
+		# Get the FINAL expanded content from PPT (this is what's actually in the slides)
+		# Priority: generated_notes > expanded_content > bullets
+		expanded_content = deck.get("generated_notes", [])
+		if not expanded_content:
+			expanded_content = deck.get("expanded_content", [])
+		
+		# Get original prompt for context
+		original_prompt = self._get_original_prompt(deck.get("promptId"))
+		
+		# Extract key concepts from FINAL content (what's actually in PPT)
 		concepts = []
-		for section_bullets in bullets:
-			for bullet in section_bullets:
-				# Simple concept extraction - in production, use NLP
-				concepts.append({
-					"text": bullet,
-					"section": sections[len(concepts) % len(sections)] if sections else "General",
-					"complexity": self._assess_concept_complexity(bullet)
-				})
+		for idx, section in enumerate(sections):
+			# Use expanded content if available, otherwise fall back to bullets
+			if idx < len(expanded_content) and expanded_content[idx]:
+				content_text = expanded_content[idx]
+			elif idx < len(bullets) and bullets[idx]:
+				# Fallback to bullets if expanded content not available
+				content_text = " ".join(bullets[idx])
+			else:
+				continue
+			
+			concepts.append({
+				"text": content_text,
+				"section": section,
+				"section_index": idx,
+				"complexity": self._assess_concept_complexity(content_text),
+				"bullets": bullets[idx] if idx < len(bullets) else []
+			})
 		
 		return {
 			"concepts": concepts,
 			"sections": sections,
+			"original_prompt": original_prompt,
+			"expanded_content": expanded_content,
 			"difficulty_level": deck.get("metadata", {}).get("difficulty_level", "intermediate"),
-			"total_concepts": len(concepts)
+			"total_concepts": len(concepts),
+			"deck_title": deck.get("title", "")
 		}
+	
+	def _get_original_prompt(self, prompt_id: Optional[str]) -> Optional[str]:
+		"""Get the original user prompt from prompts collection"""
+		if not prompt_id:
+			return None
+		try:
+			object_id = ObjectId(prompt_id)
+			prompt_doc = self.db["prompts"].find_one({"_id": object_id})
+			if prompt_doc:
+				return prompt_doc.get("prompt_text")
+		except Exception as e:
+			logger.warning(f"Failed to fetch original prompt: {e}")
+		return None
 	
 	def _assess_concept_complexity(self, text: str) -> str:
 		"""Assess complexity of a concept"""
@@ -162,15 +197,18 @@ class QuizGenerationAgent:
 		else:
 			return "medium"
 	
-	def _generate_comprehensive_quiz(self, deck: Dict, analysis: Dict, difficulty: Optional[str]) -> Quiz:
-		"""Generate comprehensive quiz covering all topics"""
+	def _generate_comprehensive_quiz(self, deck: Dict, analysis: Dict, difficulty: Optional[str], num_questions: Optional[int]) -> Quiz:
+		"""Generate comprehensive quiz covering all topics with MCQs based on final PPT content"""
 		concepts = analysis["concepts"]
 		deck_difficulty = difficulty or analysis["difficulty_level"]
+		original_prompt = analysis.get("original_prompt")
+		deck_title = analysis.get("deck_title", deck.get("title", ""))
 		
-		# Generate questions for key concepts
+		# Generate MCQ questions for key concepts (always MCQ with 4 options)
 		questions = []
-		for concept in concepts[:10]:  # Limit to 10 questions
-			question = self._generate_question_for_concept(concept, deck_difficulty)
+		limit = num_questions if num_questions and num_questions > 0 else 10
+		for concept in concepts[:limit]:
+			question = self._generate_question_for_concept(concept, deck_difficulty, original_prompt, deck_title)
 			if question:
 				questions.append(question)
 		
@@ -183,21 +221,28 @@ class QuizGenerationAgent:
 			topics_covered=list(set(q.topic for q in questions))
 		)
 	
-	def _generate_per_topic_quizzes(self, deck: Dict, analysis: Dict, difficulty: Optional[str]) -> List[Quiz]:
-		"""Generate separate quiz for each topic/section"""
+	def _generate_per_topic_quizzes(self, deck: Dict, analysis: Dict, difficulty: Optional[str], num_questions: Optional[int]) -> List[Quiz]:
+		"""Generate separate quiz for each topic/section with MCQs based on final PPT content"""
 		sections = analysis["sections"]
 		concepts = analysis["concepts"]
 		deck_difficulty = difficulty or analysis["difficulty_level"]
+		original_prompt = analysis.get("original_prompt")
+		deck_title = analysis.get("deck_title", deck.get("title", ""))
 		
 		quizzes = []
+		max_per_section = None
+		if num_questions and num_questions > 0 and len(sections) > 0:
+			max_per_section = max(1, num_questions // len(sections))
+		
 		for section in sections:
 			# Get concepts for this section
-			section_concepts = [c for c in concepts if c["section"] == section]
+			section_concepts = [c for c in concepts if c.get("section") == section]
 			
 			if section_concepts:
 				questions = []
-				for concept in section_concepts[:5]:  # Max 5 questions per section
-					question = self._generate_question_for_concept(concept, deck_difficulty)
+				limit = max_per_section if max_per_section else 5
+				for concept in section_concepts[:limit]:
+					question = self._generate_question_for_concept(concept, deck_difficulty, original_prompt, deck_title)
 					if question:
 						questions.append(question)
 				
@@ -214,17 +259,20 @@ class QuizGenerationAgent:
 		
 		return quizzes
 	
-	def _generate_final_quiz(self, deck: Dict, analysis: Dict, difficulty: Optional[str]) -> Quiz:
-		"""Generate final assessment quiz"""
+	def _generate_final_quiz(self, deck: Dict, analysis: Dict, difficulty: Optional[str], num_questions: Optional[int]) -> Quiz:
+		"""Generate final assessment quiz with MCQs based on final PPT content"""
 		concepts = analysis["concepts"]
 		deck_difficulty = difficulty or analysis["difficulty_level"]
+		original_prompt = analysis.get("original_prompt")
+		deck_title = analysis.get("deck_title", deck.get("title", ""))
 		
 		# Select most important concepts for final quiz
-		important_concepts = concepts[:8]  # Top 8 concepts
+		limit = num_questions if num_questions and num_questions > 0 else 8
+		important_concepts = concepts[:limit]
 		
 		questions = []
 		for concept in important_concepts:
-			question = self._generate_question_for_concept(concept, deck_difficulty)
+			question = self._generate_question_for_concept(concept, deck_difficulty, original_prompt, deck_title)
 			if question:
 				questions.append(question)
 		
@@ -237,59 +285,97 @@ class QuizGenerationAgent:
 			topics_covered=list(set(q.topic for q in questions))
 		)
 	
-	def _generate_question_for_concept(self, concept: Dict, difficulty: str) -> Optional[QuizQuestion]:
-		"""Generate a quiz question for a concept"""
-		concept_text = concept["text"]
+	def _generate_question_for_concept(self, concept: Dict, difficulty: str, original_prompt: Optional[str] = None, deck_title: str = "") -> Optional[QuizQuestion]:
+		"""Generate a quiz question for a concept - always use MCQ with 4 options"""
 		section = concept["section"]
-		concept_complexity = concept["complexity"]
+		concept_complexity = concept.get("complexity", "medium")
 		
-		# Determine question type based on complexity
-		if concept_complexity == "easy":
-			question_type = "true_false"
-		elif concept_complexity == "medium":
-			question_type = "mcq"
-		else:
-			question_type = "fill_blank"
-		
-		# Generate question based on type
-		if question_type == "mcq":
-			return self._generate_mcq_question(concept_text, section, difficulty)
-		elif question_type == "true_false":
-			return self._generate_true_false_question(concept_text, section, difficulty)
-		elif question_type == "fill_blank":
-			return self._generate_fill_blank_question(concept_text, section, difficulty)
-		
-		return None
+		# Always generate MCQ questions with 4 options as requested
+		return self._generate_mcq_question(concept, section, difficulty, original_prompt, deck_title)
 	
-	def _generate_mcq_question(self, concept: str, topic: str, difficulty: str) -> QuizQuestion:
-		"""Generate multiple choice question using LLM"""
-		# Use LLM to generate contextual questions
-		result = self.text_agent.generate_quiz_questions(
-			topic=concept,
-			num_questions=1,
-			question_type="mcq",
-			context={"difficulty": difficulty}
-		)
+	def _generate_mcq_question(self, concept: Dict, topic: str, difficulty: str, original_prompt: Optional[str] = None, deck_title: str = "") -> QuizQuestion:
+		"""Generate multiple choice question with exactly 4 options based on final PPT content"""
+		concept_text = concept.get("text", "")
+		section_bullets = concept.get("bullets", [])
 		
-		if result.get("success") and result.get("questions"):
-			question_data = result["questions"][0]
-			return QuizQuestion(
-				question_text=question_data.get("question", f"Which of the following best describes: {concept}?"),
-				question_type="mcq",
-				options=question_data.get("options", []),
-				correct_answer=question_data.get("correct_answer", ""),
-				explanation=question_data.get("explanation", ""),
-				difficulty=difficulty,
-				topic=topic
-			)
+		# Build context from original prompt and final content
+		context_text = ""
+		if original_prompt:
+			context_text += f"Original Topic/Prompt: {original_prompt}\n\n"
+		if deck_title:
+			context_text += f"Presentation Title: {deck_title}\n\n"
+		context_text += f"Final Content in PPT Slide:\n{concept_text}"
+		if section_bullets:
+			context_text += f"\n\nKey Points:\n" + "\n".join([f"- {bullet}" for bullet in section_bullets[:5]])
 		
-		# Fallback
-		question_text = f"Which of the following best describes: {concept}?"
+		# Generate MCQ with exactly 4 options using LLM
+		prompt = f"""Generate ONE multiple-choice question (MCQ) with EXACTLY 4 options based on the final content that appears in the PowerPoint presentation.
+
+CRITICAL REQUIREMENTS:
+1. The question MUST be based on the ACTUAL FINAL CONTENT shown below (what's in the PPT slides)
+2. Generate EXACTLY 4 options (A, B, C, D)
+3. Only ONE option should be correct
+4. The correct answer MUST be verifiable from the final content provided
+5. The other 3 options should be plausible but incorrect
+6. Provide a clear explanation referencing the final content
+
+Final Content from PPT Slide:
+{context_text}
+
+Generate a question that tests understanding of the key concepts in this final content.
+
+Format your response as JSON:
+{{
+  "question": "Question text based on the final content",
+  "options": [
+    "Option A (correct answer)",
+    "Option B (plausible but incorrect)",
+    "Option C (plausible but incorrect)",
+    "Option D (plausible but incorrect)"
+  ],
+  "correct_answer": "Option A (correct answer)",
+  "explanation": "Explanation referencing the final content provided"
+}}"""
+		
+		result = self.text_agent.generate(prompt, {"difficulty": difficulty}, max_length=1024)
+		
+		if result.get("success"):
+			try:
+				import json
+				import re
+				# Try to extract JSON from response
+				json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
+				if json_match:
+					question_data = json.loads(json_match.group())
+					options = question_data.get("options", [])
+					
+					# Ensure exactly 4 options
+					if len(options) == 4:
+						return QuizQuestion(
+							question_text=question_data.get("question", f"Based on the content about {topic}, which of the following is correct?"),
+							question_type="mcq",
+							options=options,
+							correct_answer=question_data.get("correct_answer", options[0] if options else ""),
+							explanation=question_data.get("explanation", f"This answer is correct based on the content presented in the slide about {topic}."),
+							difficulty=difficulty,
+							topic=topic
+						)
+					else:
+						logger.warning(f"LLM generated {len(options)} options instead of 4, using fallback")
+			except Exception as e:
+				logger.warning(f"Failed to parse MCQ question from LLM: {e}")
+		
+		# Fallback: Generate simple MCQ with 4 options
+		# Extract key terms from concept text
+		key_terms = concept_text.split()[:5]  # First 5 words as key terms
+		question_text = f"Based on the content about {topic}, which of the following statements is correct?"
+		
+		# Generate 4 options - first one correct, others plausible but wrong
 		options = [
-			f"Option A related to {concept}",
-			f"Option B related to {concept}",
-			f"Option C related to {concept}",
-			f"Option D related to {concept}"
+			f"The content explains that {key_terms[0] if key_terms else 'the concept'} is important",
+			f"The content states that {key_terms[1] if len(key_terms) > 1 else 'this concept'} is not relevant",
+			f"The content suggests that {key_terms[2] if len(key_terms) > 2 else 'this topic'} contradicts the main idea",
+			f"The content indicates that {key_terms[3] if len(key_terms) > 3 else 'this concept'} is unrelated"
 		]
 		
 		return QuizQuestion(
@@ -297,7 +383,7 @@ class QuizGenerationAgent:
 			question_type="mcq",
 			options=options,
 			correct_answer=options[0],
-			explanation=f"This is the correct answer because it accurately represents {concept}.",
+			explanation=f"This answer is correct based on the final content presented in the slide about {topic}. The content specifically addresses this concept.",
 			difficulty=difficulty,
 			topic=topic
 		)

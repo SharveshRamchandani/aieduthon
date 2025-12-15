@@ -1,0 +1,10 @@
+// Impact on Reaction Rates: Faster reactions occur at higher temperatures, increasing the rate of chemical transformations. Slower reactions occur at lower temperatures, reducing the rate of chemical transformations.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1 [label="Increase Reaction Rate"]
+	step1 -> end [label="Decrease Reaction Rate"]
+}

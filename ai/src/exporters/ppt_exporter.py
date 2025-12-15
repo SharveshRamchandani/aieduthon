@@ -1,7 +1,7 @@
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 import logging
 import base64
 
@@ -10,6 +10,7 @@ from bson.objectid import ObjectId
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
+from PIL import Image
 
 from ai_db import get_ai_db
 
@@ -20,6 +21,110 @@ class PPTExporter:
 	def __init__(self):
 		self.db = get_ai_db()
 		self.slides_collection = self.db["slides"]
+	
+	def _calculate_available_space_for_image(self, slide, text_frame) -> Dict[str, float]:
+		"""
+		Calculate available space on slide for image placement based on text content.
+		
+		Args:
+			slide: PowerPoint slide object
+			text_frame: Text frame object containing slide content
+			
+		Returns:
+			Dict with available space dimensions
+		"""
+		# Standard slide dimensions (10x7.5 inches for 16:9)
+		SLIDE_WIDTH = 10.0
+		SLIDE_HEIGHT = 7.5
+		MARGIN = 0.5
+		
+		# Estimate content area from text frame position
+		try:
+			# Get parent shape to access position
+			parent_shape = text_frame._parent  # Access parent shape
+			text_left = parent_shape.left / 914400.0  # Convert EMU to inches
+			text_top = parent_shape.top / 914400.0
+			text_width = parent_shape.width / 914400.0
+			text_height = parent_shape.height / 914400.0
+		except Exception:
+			# Fallback: estimate content area
+			text_left = 1.0
+			text_top = 1.5
+			text_width = 5.5
+			text_height = 5.5
+		
+		# Calculate available space for image (right side)
+		available_left = text_left + text_width + 0.2
+		available_top = text_top
+		available_width = SLIDE_WIDTH - available_left - MARGIN
+		available_height = SLIDE_HEIGHT - available_top - MARGIN
+		
+		return {
+			"left": max(MARGIN, available_left),
+			"top": max(MARGIN, available_top),
+			"width": max(2.0, available_width),  # Minimum 2 inches
+			"height": max(2.0, available_height),  # Minimum 2 inches
+		}
+	
+	def _calculate_optimal_image_size(
+		self,
+		image_path: str,
+		available_space: Dict[str, float],
+		max_size_ratio: float = 0.85,
+		min_size_ratio: float = 0.4
+	) -> Dict[str, float]:
+		"""
+		Calculate optimal image size based on available space and image dimensions.
+		
+		Args:
+			image_path: Path to image file
+			available_space: Dict with available space dimensions
+			max_size_ratio: Maximum ratio of available space to use (0.0-1.0)
+			min_size_ratio: Minimum ratio of available space to use (0.0-1.0)
+			
+		Returns:
+			Dict with optimal width, height, left, top positions
+		"""
+		try:
+			with Image.open(image_path) as image:
+				img_width_px, img_height_px = image.size
+				img_ratio = img_width_px / img_height_px if img_height_px > 0 else 1.0
+		except Exception:
+			# Fallback if image can't be opened
+			img_ratio = 1.0
+		
+		avail_w = available_space["width"]
+		avail_h = available_space["height"]
+		avail_ratio = avail_w / avail_h if avail_h > 0 else 1.0
+		
+		# Calculate optimal size maintaining aspect ratio
+		if img_ratio > avail_ratio:
+			# Image is wider than available space
+			optimal_width = avail_w * max_size_ratio
+			optimal_height = optimal_width / img_ratio
+			# Ensure minimum size
+			if optimal_height < avail_h * min_size_ratio:
+				optimal_height = avail_h * min_size_ratio
+				optimal_width = optimal_height * img_ratio
+		else:
+			# Image is taller than available space
+			optimal_height = avail_h * max_size_ratio
+			optimal_width = optimal_height * img_ratio
+			# Ensure minimum size
+			if optimal_width < avail_w * min_size_ratio:
+				optimal_width = avail_w * min_size_ratio
+				optimal_height = optimal_width / img_ratio
+		
+		# Center the image in available space
+		left = available_space["left"] + (avail_w - optimal_width) / 2
+		top = available_space["top"] + (avail_h - optimal_height) / 2
+		
+		return {
+			"left": max(available_space["left"], left),
+			"top": max(available_space["top"], top),
+			"width": min(optimal_width, avail_w),
+			"height": min(optimal_height, avail_h)
+		}
 
 	def export_deck(self, deck_id: str, output_dir: str = "..\\..\\out", user_name: str = "user") -> str:
 		"""Export slide deck to disk (legacy behavior)."""
@@ -54,21 +159,17 @@ class PPTExporter:
 		return ppt_bytes, fname
 	
 	def _export_to_pdf(self, deck_id: str, user_name: str = "user") -> Tuple[bytes, str]:
-		"""Convert PPTX to PDF using pure Python - reads PPTX and renders as PDF pages."""
-		try:
-			from reportlab.lib.pagesizes import letter, A4
-			from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-			from reportlab.lib.units import inch
-			from reportlab.lib import colors
-			from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Image as RLImage, KeepTogether
-			from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
-			from reportlab.pdfgen import canvas
-			from reportlab.lib.utils import ImageReader
-		except ImportError:
-			raise ImportError("reportlab is required for PDF export. Install with: pip install reportlab")
+		"""Convert PPTX to PDF preserving template and formatting.
 		
+		Uses LibreOffice headless mode to convert PPTX to PDF, which preserves
+		all templates, formatting, colors, fonts, images, and layout exactly as in PPTX.
+		Falls back to reportlab if LibreOffice is not available (but warns about loss of formatting).
+		"""
 		import re
 		import tempfile
+		import subprocess
+		import shutil
+		import platform
 		
 		try:
 			object_id = ObjectId(deck_id)
@@ -84,11 +185,116 @@ class PPTExporter:
 		# Generate PPTX first (in memory)
 		prs, pptx_filename = self._build_presentation(deck_id, user_name)
 		
+		# Generate filename: Topic_user_date.pdf
+		safe_title = re.sub(r'[^\w\s-]', '', title)[:50].strip().replace(' ', '_')
+		if not safe_title:
+			safe_title = "Presentation"
+		
+		safe_user = re.sub(r'[^\w\s-]', '', user_name)[:30].strip().replace(' ', '_')
+		if not safe_user:
+			safe_user = "user"
+		
+		date_str = datetime.utcnow().strftime('%Y-%m-%d')
+		filename = f"{safe_title}_{safe_user}_{date_str}.pdf"
+		
+		# Try LibreOffice conversion first (preserves template and formatting)
+		try:
+			return self._convert_pptx_to_pdf_libreoffice(prs, filename)
+		except Exception as libreoffice_error:
+			logger.warning(f"LibreOffice conversion failed: {libreoffice_error}. Falling back to reportlab (template/formatting may be lost).")
+			# Fallback to reportlab (loses template but at least produces PDF)
+			return self._convert_pptx_to_pdf_reportlab(prs, title, user_name, filename)
+	
+	def _convert_pptx_to_pdf_libreoffice(self, prs: Presentation, filename: str) -> Tuple[bytes, str]:
+		"""Convert PPTX to PDF using LibreOffice headless mode - preserves all formatting."""
+		import tempfile
+		import subprocess
+		import shutil
+		import platform
+		
+		# Check if LibreOffice is available
+		if platform.system() == "Windows":
+			# Common LibreOffice paths on Windows
+			libreoffice_paths = [
+				r"C:\Program Files\LibreOffice\program\soffice.exe",
+				r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+			]
+			soffice = None
+			for path in libreoffice_paths:
+				if Path(path).exists():
+					soffice = path
+					break
+			if not soffice:
+				# Try to find in PATH
+				soffice = shutil.which("soffice")
+		else:
+			# Linux/Mac - try to find in PATH
+			soffice = shutil.which("soffice") or shutil.which("libreoffice")
+		
+		if not soffice:
+			raise RuntimeError("LibreOffice not found. Install LibreOffice for PDF export with template preservation.")
+		
+		# Save PPTX to temporary file
+		with tempfile.TemporaryDirectory() as temp_dir:
+			pptx_path = Path(temp_dir) / "presentation.pptx"
+			pdf_path = Path(temp_dir) / "presentation.pdf"
+			
+			# Save PPTX
+			prs.save(str(pptx_path))
+			
+			# Convert using LibreOffice headless mode
+			# --headless: Run without GUI
+			# --convert-to pdf: Convert to PDF
+			# --outdir: Output directory
+			cmd = [
+				soffice,
+				"--headless",
+				"--convert-to", "pdf",
+				"--outdir", str(temp_dir),
+				str(pptx_path)
+			]
+			
+			try:
+				result = subprocess.run(
+					cmd,
+					capture_output=True,
+					text=True,
+					timeout=60,  # 60 second timeout
+					check=True
+				)
+			except subprocess.TimeoutExpired:
+				raise RuntimeError("LibreOffice conversion timed out")
+			except subprocess.CalledProcessError as e:
+				raise RuntimeError(f"LibreOffice conversion failed: {e.stderr}")
+			
+			# Check if PDF was created
+			if not pdf_path.exists():
+				raise RuntimeError("LibreOffice did not produce PDF file")
+			
+			# Read PDF bytes
+			with open(pdf_path, 'rb') as f:
+				pdf_bytes = f.read()
+			
+			return pdf_bytes, filename
+	
+	def _convert_pptx_to_pdf_reportlab(self, prs: Presentation, title: str, user_name: str, filename: str) -> Tuple[bytes, str]:
+		"""Fallback PDF conversion using reportlab - loses template but produces PDF."""
+		try:
+			from reportlab.lib.pagesizes import letter, A4
+			from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+			from reportlab.lib.units import inch
+			from reportlab.lib import colors
+			from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Image as RLImage
+			from reportlab.lib.enums import TA_CENTER, TA_LEFT
+		except ImportError:
+			raise ImportError("reportlab is required for PDF export fallback. Install with: pip install reportlab")
+		
+		import tempfile
+		
 		# Create PDF buffer
 		pdf_buffer = BytesIO()
 		
 		# Use letter size (8.5 x 11 inches) for slides
-		# Slide aspect ratio is typically 16:9, but we'll use letter for compatibility
 		doc = SimpleDocTemplate(
 			pdf_buffer,
 			pagesize=letter,
@@ -101,16 +307,6 @@ class PPTExporter:
 		styles = getSampleStyleSheet()
 		
 		# Custom styles for slides
-		title_style = ParagraphStyle(
-			'SlideTitle',
-			parent=styles['Heading1'],
-			fontSize=32,
-			textColor=colors.HexColor('#1a1a1a'),
-			spaceAfter=20,
-			alignment=TA_CENTER,
-			fontName='Helvetica-Bold'
-		)
-		
 		slide_title_style = ParagraphStyle(
 			'SlideHeading',
 			parent=styles['Heading2'],
@@ -132,6 +328,7 @@ class PPTExporter:
 		)
 		
 		story = []
+		temp_image_files = []  # Keep track of temp files to clean up after PDF is built
 		
 		# Process each slide
 		for slide_idx, slide in enumerate(prs.slides):
@@ -167,7 +364,9 @@ class PPTExporter:
 						# Save to temp file for reportlab
 						with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_img:
 							tmp_img.write(image_bytes)
-							images.append((tmp_img.name, shape))
+							img_path = tmp_img.name
+							temp_image_files.append(img_path)  # Track for cleanup
+							images.append((img_path, shape))
 					except Exception as e:
 						logger.debug(f"Failed to extract image from slide {slide_idx}: {e}")
 			
@@ -226,32 +425,23 @@ class PPTExporter:
 					story.append(Spacer(1, 0.2*inch))
 				except Exception as e:
 					logger.debug(f"Failed to add image to PDF: {e}")
-				finally:
-					# Clean up temp image file
-					try:
-						Path(img_path).unlink()
-					except:
-						pass
 			
 			# Add page break after each slide (except last)
 			if slide_idx < len(prs.slides) - 1:
 				story.append(PageBreak())
 		
-		# Build PDF
-		doc.build(story)
-		pdf_bytes = pdf_buffer.getvalue()
-		
-		# Generate filename: Topic_user_date.pdf
-		safe_title = re.sub(r'[^\w\s-]', '', title)[:50].strip().replace(' ', '_')
-		if not safe_title:
-			safe_title = "Presentation"
-		
-		safe_user = re.sub(r'[^\w\s-]', '', user_name)[:30].strip().replace(' ', '_')
-		if not safe_user:
-			safe_user = "user"
-		
-		date_str = datetime.utcnow().strftime('%Y-%m-%d')
-		filename = f"{safe_title}_{safe_user}_{date_str}.pdf"
+		# Build PDF (this is when ReportLab reads the image files)
+		try:
+			doc.build(story)
+			pdf_bytes = pdf_buffer.getvalue()
+		finally:
+			# Clean up temp image files AFTER PDF is built
+			for img_path in temp_image_files:
+				try:
+					if Path(img_path).exists():
+						Path(img_path).unlink()
+				except Exception as e:
+					logger.debug(f"Failed to delete temp image file {img_path}: {e}")
 		
 		return pdf_bytes, filename
 	
@@ -406,23 +596,31 @@ class PPTExporter:
 						response = requests.get(url, timeout=15)
 						response.raise_for_status()
 						img_bytes = response.content
-						# Basic right-side placement; template-specific tuning can be
-						# added later if needed.
-						left = Inches(6.0)
-						top = Inches(2.0)
-						width = Inches(3.0)
 						tmp_path = Path("_ppt_tmp_image.png")
 						tmp_path.write_bytes(img_bytes)
 						try:
-							slide.shapes.add_picture(str(tmp_path), left, top, width=width)
+							# Calculate available space dynamically based on text content
+							available_space = self._calculate_available_space_for_image(slide, text_frame)
+							# Calculate optimal image size
+							optimal_size = self._calculate_optimal_image_size(str(tmp_path), available_space)
+							
+							# Add image with dynamically calculated size
+							slide.shapes.add_picture(
+								str(tmp_path),
+								Inches(optimal_size["left"]),
+								Inches(optimal_size["top"]),
+								width=Inches(optimal_size["width"]),
+								height=Inches(optimal_size["height"])
+							)
 						finally:
 							try:
 								tmp_path.unlink()
 							except OSError:
 								# Non-fatal if temp cleanup fails.
 								pass
-					except Exception:
+					except Exception as e:
 						# If image download or placement fails, continue without blocking export.
+						logger.debug(f"Failed to add image to slide {idx}: {e}")
 						pass
 
 			# Speaker notes priority

@@ -1,0 +1,23 @@
+// 1. Viscosity as a Fundamental Property: Dynamic Viscosity (Absolute Viscosity): Defined by the equation $\tau = \mu \frac{du}{dy}$ from Newton's law, where $\tau$ is shear stress and $\frac{du}{dy}$ is the velocity gradient. This constant quantifies internal friction in a fluid. Practical Measurement: Used with capillary flow or rotational viscometers to measure viscosity accurately.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	A [label="Concept: Viscosity as a Fundamental Property"]
+	B [label="Type: Dynamic Viscosity (Absolute Viscosity)"]
+	C [label="Definition/Governing Law: Newton's Law of Viscosity"]
+	D [label="Equation: $\tau = \mu \frac{du}{dy}$"]
+	E [label="Components: $\tau$ (Shear Stress), $\frac{du}{dy}$ (Velocity Gradient)"]
+	F [label="Physical Meaning: Quantifies internal friction in a fluid"]
+	G [label="Practical Application: Measurement"]
+	H [label="Methods: Capillary Flow or Rotational Viscometers"]
+	I [label="Goal: Accurate Viscosity Measurement"]
+	A -> B [label="Focuses on"]
+	B -> C [label="Defined by"]
+	C -> D [label="Expressed as"]
+	D -> E [label=Involves]
+	D -> F [label="Where $\mu$ quantifies"]
+	B -> G [label="Is determined via"]
+	G -> H [label=Using]
+	H -> I [label="To achieve"]
+}

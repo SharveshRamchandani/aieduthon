@@ -1,0 +1,9 @@
+// Applications of the Theorem: Industrial chemistry processes, such as the production of polymers and pharmaceuticals, rely heavily on precise temperature control to optimize reaction yields. Food processing industries utilize temperature regulation to ensure the quality and safety of food products.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1
+}

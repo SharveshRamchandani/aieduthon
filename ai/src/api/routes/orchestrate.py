@@ -18,6 +18,7 @@ class OrchestrateRequest(BaseModel):
 	locale: str = "en"
 	context: Optional[Dict[str, Any]] = None
 	quiz_type: str = "comprehensive"
+	quiz_questions: Optional[int] = Field(default=None, ge=1, le=50)
 	audience_level: Optional[str] = None
 	presentation_style: str = "educational"
 	generate_images: bool = True
@@ -34,6 +35,8 @@ def orchestrate(body: OrchestrateRequest):
 	merged_context = dict(body.context or {})
 	if body.estimated_slides is not None:
 		merged_context["estimated_slides"] = body.estimated_slides
+	if body.quiz_questions is not None:
+		merged_context["quiz_questions"] = body.quiz_questions
 
 	# 1) Slides
 	slides_agent = PromptToSlideAgent()
@@ -65,6 +68,7 @@ def orchestrate(body: OrchestrateRequest):
 		user_id=body.userId,
 		quiz_type=body.quiz_type,
 		difficulty=None,
+		num_questions=body.quiz_questions,
 	)
 	if not quiz_result.get("success"):
 		raise HTTPException(status_code=500, detail=quiz_result.get("error", "Quiz generation failed"))

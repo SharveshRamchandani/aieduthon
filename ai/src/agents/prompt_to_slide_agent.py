@@ -6,6 +6,7 @@ Uses LLM for intelligent content generation
 import json
 import logging
 from datetime import datetime
+import re
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, asdict
 
@@ -359,28 +360,67 @@ Return JSON:
             logger.error(f"LLM generation failed: {result.get('error', 'Unknown error')}")
             raise Exception(f"Failed to generate slide content: {result.get('error', 'LLM generation failed')}")
         
-        # Parse the expanded LLM content
+        # Parse the expanded LLM content (with fallbacks)
         try:
+            raw_text = result["text"]
+            # Repair invalid backslash escapes that can break JSON parsing
+            cleaned_text = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', raw_text)
+            if cleaned_text != raw_text:
+                logger.warning("LLM JSON contained invalid backslash escapes; applied repair before parsing.")
             prepared_payload = prepare_slides_from_raw(
-                result["text"],
+                cleaned_text,
                 desired_slide_count=slide_count
             )
             title = prepared_payload.get("meta", {}).get("presentation_title", f"{subject.title()} Presentation")
             slides_data = prepared_payload.get("slides", [])
             
-            if not slides_data or len(slides_data) == 0:
-                logger.error("LLM returned empty slides data")
-                raise Exception("LLM generated empty slides - check LLM response")
+            if not isinstance(slides_data, list) or len(slides_data) == 0:
+                logger.error("LLM returned empty or invalid slides data")
+                raise Exception("LLM generated empty or invalid slides - check LLM response")
             
         except Exception as exc:
             logger.error(f"Failed to parse LLM-generated slides: {exc}")
             logger.error(f"LLM response text: {result.get('text', '')[:500]}")
-            raise Exception(f"Failed to parse expanded slide content: {exc}")
+            
+            fallback_payload = None
+            # Fallback 1: direct JSON extraction
+            try:
+                json_match = re.search(r'\{.*\}', cleaned_text if 'cleaned_text' in locals() else result.get("text", ""), re.DOTALL)
+                if json_match:
+                    payload = json.loads(json_match.group())
+                    if isinstance(payload, dict) and "slides" in payload:
+                        fallback_payload = {
+                            "meta": payload.get("meta", {}),
+                            "slides": payload.get("slides", [])
+                        }
+            except Exception as e2:
+                logger.warning(f"Fallback JSON extraction failed: {e2}")
+            
+            # Fallback 2: parse text to slides using text_agent helper
+            if not fallback_payload:
+                try:
+                    simple = self.text_agent._parse_text_to_slides(result.get("text", ""), subject, slide_count)
+                    fallback_payload = {
+                        "meta": {"presentation_title": subject.title()},
+                        "slides": simple.get("slides", [])
+                    }
+                except Exception as e3:
+                    logger.warning(f"Fallback text parsing failed: {e3}")
+            
+            if fallback_payload and fallback_payload.get("slides"):
+                prepared_payload = fallback_payload
+                title = prepared_payload.get("meta", {}).get("presentation_title", f"{subject.title()} Presentation")
+                slides_data = prepared_payload.get("slides", [])
+            else:
+                raise Exception(f"Failed to parse expanded slide content: {exc}")
         
         # Build slides from LLM-generated content
         slides = []
         sections = []
         for slide_data in slides_data:
+            if not isinstance(slide_data, dict):
+                logger.warning(f"Skipping slide entry that is not a dict: {slide_data}")
+                continue
             section_title = slide_data.get("title", "")
             if not section_title:
                 continue  # Skip slides without titles
@@ -388,6 +428,8 @@ Return JSON:
             
             # Get bullets from LLM-generated content
             bullets = slide_data.get("bullets", [])
+            if not isinstance(bullets, list):
+                bullets = []
             if not bullets:
                 logger.warning(f"Slide '{section_title}' has no bullets, skipping")
                 continue
@@ -395,17 +437,18 @@ Return JSON:
             # Get the expanded content - combine bullets into full text content
             # This is the content after 3 passes (Gemini -> Gemini -> Deepseek)
             expanded_content = " ".join(bullets) if bullets else ""
-            if slide_data.get("notes"):
-                expanded_content += " " + slide_data.get("notes", "")
+            notes_text = slide_data.get("notes", "")
+            if isinstance(notes_text, str) and notes_text:
+                expanded_content += " " + notes_text
             
             slides.append(SlideContent(
                 title=section_title,
                 bullets=bullets,  # Keep for backward compatibility
-                examples=slide_data.get("examples", []),
-                key_points=slide_data.get("key_points", []),
+                examples=slide_data.get("examples", []) if isinstance(slide_data.get("examples", []), list) else [],
+                key_points=slide_data.get("key_points", []) if isinstance(slide_data.get("key_points", []), list) else [],
                 estimated_duration=self._estimate_slide_duration(complexity),
-                images=slide_data.get("images", []),
-                notes=expanded_content  # Store expanded content in notes field
+                images=slide_data.get("images", []) if isinstance(slide_data.get("images", []), list) else [],
+                notes=expanded_content.strip()  # Store expanded content in notes field
             ))
         
         # If we still don't have enough slides, log error but don't use generic fallback

@@ -1,0 +1,15 @@
+[{
+  "_id": {
+    "$oid": "6940f44ce0e3a7e856d4030b"
+  },
+  "filename": "Cyan Gradient Technology Startup Business Company Presentation.pptx",
+  "templateId": "cyan_gradient_technology_startup_business_company_presentation",
+  "contentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "chunkSize": 261120,
+  "length": {
+    "$numberLong": "38015996"
+  },
+  "uploadDate": {
+    "$date": "2025-12-16T05:55:24.706Z"
+  }
+}]

@@ -4,9 +4,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import logging
 import base64
+import io
 
 import requests
 from bson.objectid import ObjectId
+from gridfs import GridFS
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
@@ -481,9 +483,50 @@ class PPTExporter:
 			raise FileNotFoundError("Slide deck not found")
 
 		template_path = deck.get("template_path") or deck.get("metadata", {}).get("template_path")
-		if template_path and Path(template_path).exists():
+		
+		# Check if template is stored in MongoDB (prefixed with "db:")
+		if template_path and template_path.startswith("db:"):
+			# Load template from MongoDB
+			template_id = template_path.replace("db:", "")
+			templates_collection = self.db["templates"]
+			template_doc = templates_collection.find_one({"templateId": template_id})
+			
+			if template_doc:
+				try:
+					storage_type = template_doc.get("storage_type", "base64")
+					
+					if storage_type == "gridfs":
+						# Load from GridFS
+						fs = GridFS(self.db, collection="templates_fs")
+						gridfs_file_id = template_doc.get("template_file_id")
+						
+						if gridfs_file_id:
+							gridfs_file = fs.get(ObjectId(gridfs_file_id))
+							template_bytes = gridfs_file.read()
+							prs = Presentation(io.BytesIO(template_bytes))
+							logger.info(f"Loaded template '{template_id}' from GridFS ({len(template_bytes)} bytes)")
+						else:
+							raise ValueError("GridFS file ID not found")
+					elif template_doc.get("template_file"):
+						# Load from base64
+						template_base64 = template_doc["template_file"]
+						template_bytes = base64.b64decode(template_base64)
+						prs = Presentation(io.BytesIO(template_bytes))
+						logger.info(f"Loaded template '{template_id}' from MongoDB base64 ({len(template_bytes)} bytes)")
+					else:
+						raise ValueError("Template file data not found")
+						
+				except Exception as e:
+					logger.warning(f"Failed to load template from DB: {e}, using default template")
+					prs = Presentation()
+			else:
+				logger.warning(f"Template '{template_id}' not found in MongoDB, using default template")
+				prs = Presentation()
+		elif template_path and Path(template_path).exists():
+			# Fallback to file system
 			prs = Presentation(template_path)
 		else:
+			# No template specified, use default
 			prs = Presentation()
 
 		# Title slide – overwrite the first slide in the template if present,
@@ -643,6 +686,91 @@ class PPTExporter:
 				notes_frame = slide.notes_slide.notes_text_frame
 				notes_frame.clear()
 				notes_frame.text = notes_text.strip()
+
+		# Smart slide removal: Keep important conclusion slides (Thank You, Questions, etc.) and remove middle slides
+		# Strategy: Keep title (0) + user content (1 to len(sections)) + important end slides (last 1-2)
+		def _is_important_conclusion_slide(slide) -> bool:
+			"""Detect if slide is an important conclusion slide (Thank You, Questions, etc.)"""
+			conclusion_keywords = [
+				"thank you", "thanks", "thank", "questions", "q&a", "qa", 
+				"conclusion", "conclusions", "summary", "contact", "reach out",
+				"any questions", "questions?", "thank", "appreciation"
+			]
+			try:
+				# Check title
+				if slide.shapes.title and slide.shapes.title.text:
+					title_text = slide.shapes.title.text.lower().strip()
+					if any(keyword in title_text for keyword in conclusion_keywords):
+						return True
+				# Check all text shapes
+				for shape in slide.shapes:
+					if hasattr(shape, "text") and shape.text:
+						text = shape.text.lower().strip()
+						if any(keyword in text for keyword in conclusion_keywords):
+							return True
+			except:
+				pass
+			return False
+		
+		# Detect important conclusion slides (usually last 1-2 slides)
+		important_end_slides = []
+		for i in range(max(0, len(prs.slides) - 2), len(prs.slides)):
+			if i > 0 and _is_important_conclusion_slide(prs.slides[i]):
+				important_end_slides.append(i)
+		
+		# Calculate what we need: title (1) + user content (len(sections)) + important end slides
+		num_important_end = len(important_end_slides)
+		total_needed = 1 + len(sections) + num_important_end
+		
+		if len(prs.slides) > total_needed:
+			slides_to_remove = len(prs.slides) - total_needed
+			logger.info(f"Template has {len(prs.slides)} slides, need {total_needed} (title + {len(sections)} content + {num_important_end} conclusion). Removing {slides_to_remove} middle slide(s).")
+			
+			# Remove middle slides, keeping: title (0), user content area, and important end slides
+			# We'll remove slides from the middle range, not from the end
+			try:
+				sldIdLst = prs.slides._sldIdLst
+				# Calculate which slides to remove (middle ones, not end ones)
+				# Keep: slide 0 (title), slides 1 to len(sections) (user content), and important end slides
+				slides_to_keep_indices = set([0])  # Title slide
+				slides_to_keep_indices.update(range(1, 1 + len(sections)))  # User content slides
+				slides_to_keep_indices.update(important_end_slides)  # Important conclusion slides
+				
+				# Remove slides that are NOT in the keep list (work backwards to avoid index issues)
+				indices_to_remove = []
+				for i in range(len(prs.slides) - 1, -1, -1):
+					if i not in slides_to_keep_indices:
+						indices_to_remove.append(i)
+				
+				# Remove slide references (work backwards)
+				for idx in sorted(indices_to_remove, reverse=True):
+					if idx < len(sldIdLst):
+						try:
+							sldIdLst.remove(sldIdLst[idx])
+						except:
+							pass
+				
+				logger.info(f"Successfully removed {len(indices_to_remove)} middle slide(s), kept {num_important_end} important conclusion slide(s).")
+			except Exception as e:
+				# If removal fails, at least clear the content of middle slides (keep end slides intact)
+				logger.warning(f"Could not remove slide references: {e}. Clearing content of middle slides instead.")
+				slides_to_keep_indices = set([0])
+				slides_to_keep_indices.update(range(1, 1 + len(sections)))
+				slides_to_keep_indices.update(important_end_slides)
+				
+				for i in range(len(prs.slides)):
+					if i not in slides_to_keep_indices:
+						try:
+							extra_slide = prs.slides[i]
+							# Clear all shapes on the extra slide
+							for shape in list(extra_slide.shapes):
+								try:
+									sp = shape._element
+									sp.getparent().remove(sp)
+								except:
+									pass
+						except Exception as e2:
+							logger.debug(f"Could not clear slide {i}: {e2}")
 
 		# Generate filename: Topic_user_date.pptx
 		title = deck.get("title", "Presentation")

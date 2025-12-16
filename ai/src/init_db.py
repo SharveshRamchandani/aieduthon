@@ -63,7 +63,11 @@ def create_collections_and_indexes():
     # 8. Templates collection
     templates = db["templates"]
     templates.create_index([("templateId", 1)], unique=True)
+    templates.create_index([("filename", 1)], unique=True)
+    templates.create_index([("filename_lower", 1)])
     templates.create_index([("recommended_for_audience", 1)])
+    templates.create_index([("subjects", 1)])
+    templates.create_index([("styles", 1)])
     print("[OK] Created templates collection with indexes")
     
     # 9. Jobs collection

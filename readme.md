@@ -98,12 +98,17 @@ Template Selection
 - Multiple presentation templates available
 - Automatic template selection based on content
 - Supports various styles: academic, business, creative, minimalist
+- Smart slide management: Automatically removes unused template slides
+- Preserves important conclusion slides (Thank You, Questions, etc.)
+- Adaptive slide count: Adjusts to your content needs while keeping template structure
 
 PowerPoint Export
 - Exports complete presentations as PPTX files
 - Integrates images and diagrams into slides
 - Maintains proper formatting and layout
 - Validates content quality
+- Stores PPT files in database for easy retrieval
+- Supports both PPTX and PDF export formats
 
 Project Structure
 
@@ -191,6 +196,35 @@ Setup Instructions
 - Gemini API key
 
 ### Python Backend Setup
+
+#### Option 1: Docker (Recommended)
+
+Navigate to the AI backend directory:
+
+```bash
+cd ai
+```
+
+Build the Docker image:
+
+```bash
+docker build -t ai-service .
+```
+
+Run the container:
+
+```bash
+docker run --rm -p 8000:8000 \
+  --env-file .env \
+  -v "$(pwd)/out:/app/src/out" \
+  ai-service
+```
+
+The API will be available at http://localhost:8000
+
+See `ai/DOCKER_README.md` for detailed Docker instructions.
+
+#### Option 2: Local Setup
 
 Navigate to the AI backend directory:
 
@@ -565,6 +599,9 @@ PowerPoint Export:
 - Proper formatting and layouts
 - Template application
 - Content validation
+- **Database Storage**: PPT files are automatically stored in MongoDB for easy retrieval
+- **Smart Slide Management**: Automatically removes unused template slides while preserving important conclusion slides
+- **Adaptive Templates**: Works with templates of any size - removes middle slides when fewer slides are needed
 
 PDF Export:
 - Speaker notes as PDF
@@ -581,6 +618,10 @@ Core Features: Fully Implemented
 - Speaker notes generation
 - Quiz generation
 - PowerPoint export
+- Docker containerization for AI service
+- PPT storage in database
+- Smart template slide management
+- Adaptive slide removal with conclusion slide preservation
 
 Partial Features:
 - Presentation style variations (currently educational style)

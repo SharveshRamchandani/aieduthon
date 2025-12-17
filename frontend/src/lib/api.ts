@@ -60,6 +60,7 @@ export interface OrchestrateRequest {
   presentation_style?: string;
   generate_images?: boolean;
   generate_diagrams?: boolean;
+  estimated_slides?: number;
 }
 
 export interface OrchestrateResponse {
@@ -193,12 +194,16 @@ export async function generateMediaForDeck(
   return response.json();
 }
 
-// Export Deck to PPTX
-export async function exportDeck(deckId: string, outputDir?: string): Promise<{ filePath: string }> {
+// Export Deck to PPTX or PDF
+export async function exportDeck(deckId: string, format: 'pptx' | 'pdf' = 'pptx', userName: string = 'user', outputDir?: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/slides/${deckId}/export`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ output_dir: outputDir }),
+    body: JSON.stringify({ 
+      output_dir: outputDir,
+      format: format,
+      user_name: userName
+    }),
   });
 
   if (!response.ok) {
@@ -206,7 +211,26 @@ export async function exportDeck(deckId: string, outputDir?: string): Promise<{ 
     throw new Error(error || 'Failed to export deck');
   }
 
-  return response.json();
+  // Get filename from Content-Disposition header or use default
+  const contentDisposition = response.headers.get('Content-Disposition');
+  let filename = `deck_${deckId}.${format}`;
+  if (contentDisposition) {
+    const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+    if (filenameMatch) {
+      filename = filenameMatch[1];
+    }
+  }
+
+  // Create blob and trigger download
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 }
 
 // Generate Speaker Notes
@@ -216,7 +240,7 @@ export async function generateSpeakerNotes(
   audienceLevel?: string,
   presentationStyle?: string
 ): Promise<{ success: boolean; speaker_notes: any[] }> {
-  const response = await fetch(`${API_BASE_URL}/slides/${deckId}/notes`, {
+  const response = await fetch(`${API_BASE_URL}/slides/${deckId}/speaker-notes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -229,6 +253,23 @@ export async function generateSpeakerNotes(
   if (!response.ok) {
     const error = await response.text();
     throw new Error(error || 'Failed to generate speaker notes');
+  }
+
+  // Check if response is a PDF file
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/pdf')) {
+    // Handle PDF download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `speaker_notes_${deckId}_${Date.now()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    return { success: true, speaker_notes: [] };
   }
 
   return response.json();

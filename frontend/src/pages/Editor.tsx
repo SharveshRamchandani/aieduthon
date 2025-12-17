@@ -34,6 +34,7 @@ const Editor = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const { toast } = useToast();
   const defaultTitle = 'Agile Methodology in Software Development: Embracing Change for Success';
   const defaultContent = 'Discover how Agile transforms software development through flexibility, collaboration, and continuous improvement';
@@ -144,11 +145,13 @@ const Editor = () => {
     if (!id) return;
 
     setIsExporting(true);
+    setExportDialogOpen(false);
     try {
-      const result = await exportDeck(id);
+      const userName = user?.name || 'user';
+      await exportDeck(id, format, userName);
       toast({
         title: 'Success',
-        description: `Presentation exported to ${result.filePath}`,
+        description: `Presentation downloaded as ${format.toUpperCase()}!`,
       });
     } catch (err) {
       toast({

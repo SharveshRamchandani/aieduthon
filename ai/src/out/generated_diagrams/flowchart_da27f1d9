@@ -1,0 +1,11 @@
+// The Process: Light-Dependent Reactions: Sunlight triggers reactions. Water is split, releasing oxygen.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1 [label="Light-Dependent Reactions"]
+	step1 -> watersplit [label="Water is split"]
+	watersplit -> oxygen_release [label="Oxygen is released"]
+}

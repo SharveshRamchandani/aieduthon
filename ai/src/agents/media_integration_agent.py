@@ -8,9 +8,19 @@ from datetime import datetime
 from collections import defaultdict
 
 from agents.image_generation_agent import ImageGenerationAgent
+from agents.stock_image_agent import StockImageAgent
 from agents.diagram_generation_agent import DiagramGenerationAgent
 from agents.text_generation_agent import TextGenerationAgent
 from ai_db import get_ai_db
+
+# Import config module
+import importlib.util
+from pathlib import Path
+config_file = Path(__file__).parent.parent / "config.py"
+spec = importlib.util.spec_from_file_location("ai_config", config_file)
+ai_config = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ai_config)
+get_config = ai_config.get_config
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +32,22 @@ class MediaIntegrationAgent:
         self.db = get_ai_db()
         self.slides_collection = self.db["slides"]
         self.media_collection = self.db["media"]
-        self.image_agent = ImageGenerationAgent()
+        self.config = get_config()
+        
+        # Determine image source preference (stock or generate)
+        self.use_stock_images = (self.config.image_source or "stock").lower() == "stock"
+        
+        # Initialize agents (lazy load image generation agent only if needed)
+        self.stock_image_agent = StockImageAgent()
+        self.image_agent = None  # Lazy load only if generation is needed
         self.diagram_agent = DiagramGenerationAgent()
         self.text_agent = TextGenerationAgent()
+    
+    def _get_image_agent(self):
+        """Lazy load image generation agent only when needed"""
+        if self.image_agent is None:
+            self.image_agent = ImageGenerationAgent()
+        return self.image_agent
     
     def generate_media_for_deck(self,
                                 deck_id: str,
@@ -83,7 +106,7 @@ class MediaIntegrationAgent:
                 slide_diagrams: List[str] = []
                 slide_media_details: List[Dict[str, Any]] = []
                 
-                # Generate image if enabled
+                # Generate/fetch image if enabled
                 if generate_images:
                     placeholders = image_placeholders[i] if i < len(image_placeholders) else []
                     marker_payloads: List[Dict[str, Any]] = []
@@ -99,38 +122,120 @@ class MediaIntegrationAgent:
                             marker_payloads.append(marker_payload)
                     
                     image_result = None
-                    if marker_payloads:
-                        marker_generation = self.image_agent.generate_from_markers(
-                            markers=marker_payloads,
-                            session_id=session_id,
-                            context=context,
-                            caption=auto_caption
-                        )
-                        image_result = marker_generation
-                        if marker_generation.get("success"):
-                            for item in marker_generation.get("items", []):
-                                url = item.get("url")
-                                if url:
-                                    slide_media.append(url)
-                                    slide_media_details.append(item)
-                        else:
-                            logger.warning(f"Marker-driven image generation failed for slide {i}: {marker_generation.get('errors')}")
                     
-                    if not slide_media and (image_result is None or not image_result.get("success")):
-                        fallback_result = self.image_agent.generate_for_slide(
-                            section,
-                            slide_bullets,
-                            context
-                        )
-                        if fallback_result.get("success") and fallback_result.get("urls"):
-                            slide_media.extend(fallback_result["urls"])
-                            slide_media_details.append({
-                                "prompt": fallback_result.get("prompt"),
-                                "url": fallback_result["urls"][0],
-                                "media_id": (fallback_result.get("media_ids") or [None])[0],
-                                "caption": (fallback_result.get("captions") or [None])[0],
-                                "source": "fallback"
-                            })
+                    # Use stock images by default, fallback to generation if needed
+                    if self.use_stock_images:
+                        # Try stock images first
+                        if marker_payloads:
+                            stock_result = self.stock_image_agent.get_images_from_markers(
+                                markers=marker_payloads,
+                                context=context
+                            )
+                            if stock_result.get("success") and stock_result.get("items"):
+                                for item in stock_result["items"]:
+                                    url = item.get("url")
+                                    if url:
+                                        slide_media.append(url)
+                                        slide_media_details.append({
+                                            **item,
+                                            "source": "stock"
+                                        })
+                                image_result = stock_result
+                        
+                        # Fallback to single slide search if no markers
+                        if not slide_media:
+                            stock_result = self.stock_image_agent.get_image_for_slide(
+                                slide_title=section,
+                                slide_content=slide_bullets,
+                                context=context
+                            )
+                            if stock_result.get("success") and stock_result.get("url"):
+                                slide_media.append(stock_result["url"])
+                                slide_media_details.append({
+                                    "url": stock_result["url"],
+                                    "thumbnail": stock_result.get("thumbnail"),
+                                    "media_id": stock_result.get("media_id"),
+                                    "provider": stock_result.get("provider"),
+                                    "description": stock_result.get("description", ""),
+                                    "author": stock_result.get("author", ""),
+                                    "query": stock_result.get("query", ""),
+                                    "source": "stock"
+                                })
+                                image_result = stock_result
+                        
+                        # If stock images failed, fallback to generation (if enabled)
+                        if not slide_media:
+                            logger.info(f"Stock images not available for slide {i}, falling back to generation")
+                            if marker_payloads:
+                                gen_result = self._get_image_agent().generate_from_markers(
+                                    markers=marker_payloads,
+                                    session_id=session_id,
+                                    context=context,
+                                    caption=auto_caption
+                                )
+                                image_result = gen_result
+                                if gen_result.get("success"):
+                                    for item in gen_result.get("items", []):
+                                        url = item.get("url")
+                                        if url:
+                                            slide_media.append(url)
+                                            slide_media_details.append({
+                                                **item,
+                                                "source": "generated"
+                                            })
+                            
+                            if not slide_media:
+                                gen_result = self._get_image_agent().generate_for_slide(
+                                    section,
+                                    slide_bullets,
+                                    context
+                                )
+                                if gen_result.get("success") and gen_result.get("urls"):
+                                    slide_media.extend(gen_result["urls"])
+                                    slide_media_details.append({
+                                        "prompt": gen_result.get("prompt"),
+                                        "url": gen_result["urls"][0],
+                                        "media_id": (gen_result.get("media_ids") or [None])[0],
+                                        "caption": (gen_result.get("captions") or [None])[0],
+                                        "source": "generated"
+                                    })
+                    else:
+                        # Use image generation directly (legacy mode)
+                        if marker_payloads:
+                            marker_generation = self._get_image_agent().generate_from_markers(
+                                markers=marker_payloads,
+                                session_id=session_id,
+                                context=context,
+                                caption=auto_caption
+                            )
+                            image_result = marker_generation
+                            if marker_generation.get("success"):
+                                for item in marker_generation.get("items", []):
+                                    url = item.get("url")
+                                    if url:
+                                        slide_media.append(url)
+                                        slide_media_details.append({
+                                            **item,
+                                            "source": "generated"
+                                        })
+                            else:
+                                logger.warning(f"Marker-driven image generation failed for slide {i}: {marker_generation.get('errors')}")
+                        
+                        if not slide_media and (image_result is None or not image_result.get("success")):
+                            fallback_result = self._get_image_agent().generate_for_slide(
+                                section,
+                                slide_bullets,
+                                context
+                            )
+                            if fallback_result.get("success") and fallback_result.get("urls"):
+                                slide_media.extend(fallback_result["urls"])
+                                slide_media_details.append({
+                                    "prompt": fallback_result.get("prompt"),
+                                    "url": fallback_result["urls"][0],
+                                    "media_id": (fallback_result.get("media_ids") or [None])[0],
+                                    "caption": (fallback_result.get("captions") or [None])[0],
+                                    "source": "generated"
+                                })
                 
                 # Generate diagram if enabled and appropriate
                 if generate_diagrams and self._should_generate_diagram(section, slide_bullets):
@@ -200,14 +305,25 @@ class MediaIntegrationAgent:
                 "diagrams": []
             }
             
-            # Generate image
-            image_result = self.image_agent.generate_for_slide(
-                slide_title,
-                slide_content,
-                context
-            )
-            if image_result.get("success") and image_result.get("urls"):
-                media["images"] = image_result["urls"]
+            # Generate/fetch image
+            if self.use_stock_images:
+                # Use stock images
+                image_result = self.stock_image_agent.get_image_for_slide(
+                    slide_title,
+                    slide_content,
+                    context
+                )
+                if image_result.get("success") and image_result.get("url"):
+                    media["images"] = [image_result["url"]]
+            else:
+                # Use image generation
+                image_result = self._get_image_agent().generate_for_slide(
+                    slide_title,
+                    slide_content,
+                    context
+                )
+                if image_result.get("success") and image_result.get("urls"):
+                    media["images"] = image_result["urls"]
             
             # Generate diagram if appropriate
             if self._should_generate_diagram(slide_title, slide_content):

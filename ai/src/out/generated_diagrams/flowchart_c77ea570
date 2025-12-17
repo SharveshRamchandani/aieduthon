@@ -1,0 +1,9 @@
+// What is Photosynthesis?: Photosynthesis is the remarkable process by which plants convert light energy into chemical energy in the form of sugars. It’s the cornerstone of nearly all ecosystems, providing the primary source of organic matter and oxygen for many organisms.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1 [label=Photosynthesis]
+}

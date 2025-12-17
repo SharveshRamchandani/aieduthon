@@ -1,0 +1,9 @@
+// The Ingredients: Sunlight, Water, and Carbon Dioxide: Sunlight provides the initial energy needed to drive the reaction, acting as the driving force behind the entire process. Water is absorbed through the plant’s roots and transported to the leaves, where it participates in the conversion of light energy into chemical energy.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1
+}

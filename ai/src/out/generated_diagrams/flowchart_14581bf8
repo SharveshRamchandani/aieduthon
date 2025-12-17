@@ -1,0 +1,7 @@
+// Why is Photosynthesis Important?: Photosynthesis is the foundation of most food chains, as plants are the primary producers, converting sunlight into usable energy for other organisms. It’s the primary source of oxygen in the Earth’s atmosphere, which is essential for respiration and the survival of most animals and humans.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label="Why is Photosynthesis Important?"]
+}

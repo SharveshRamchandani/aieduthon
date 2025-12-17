@@ -1,0 +1,6 @@
+// Cell Structure: Cell membrane: controls what enters and exits. Cytoplasm: the jelly-like substance inside.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightgreen shape=box style="rounded,filled"]
+	root [label="Cell Structure: Cell membrane: controls what enter"]
+}

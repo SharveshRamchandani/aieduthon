@@ -39,7 +39,7 @@ def connect_to_ai_mongo() -> Database:
 
 
 def get_ai_db() -> Database:
-	"""Return the connected AI Database. Call connect_to_ai_mongo() first if needed."""
+	"""Return theo connected AI Database. Call connect_to_ai_mongo() first if needed."""
 	if _db is None:
 		return connect_to_ai_mongo()
 	return _db

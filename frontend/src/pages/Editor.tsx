@@ -6,10 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-import { ExportDialog } from '@/components/ExportDialog';
-import { Plus, Trash2, Download, ChevronLeft, ChevronRight, Send, Image, Network, Loader2, Sparkles } from 'lucide-react';
-import { getDeck, generateMediaForDeck, exportDeck, generateSpeakerNotes, generateQuiz, SlideDeck } from '@/lib/api';
+import { Plus, Trash2, Download, ChevronLeft, ChevronRight, Send, Image, Network, Loader2, Sparkles, Search, Type, LayoutGrid, Orbit, BarChart3, Film, Globe2, PenSquare, List, X, MessageSquare, MonitorPlay } from 'lucide-react';
+import { getDeck, generateMediaForDeck, exportDeck, generateSpeakerNotes, generateQuiz, downloadDeckImages, SlideDeck } from '@/lib/api';
 
 interface Slide {
   id: string;
@@ -36,9 +34,12 @@ const Editor = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'filmstrip' | 'list'>('filmstrip');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isPresenting, setIsPresenting] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const defaultTitle = 'Agile Methodology in Software Development: Embracing Change for Success';
+  const defaultContent = 'Discover how Agile transforms software development through flexibility, collaboration, and continuous improvement';
 
   useEffect(() => {
     const loadDeck = async () => {
@@ -49,6 +50,12 @@ const Editor = () => {
         const deck: SlideDeck = await getDeck(id);
         
         // Convert deck to presentation format
+        const normalizeDiagramUrl = (url?: string) => {
+          if (!url) return '';
+          if (url.startsWith('http') || url.startsWith('/media') || url.startsWith('data:')) return url;
+          return '';
+        };
+
         const slides: Slide[] = deck.sections.map((section, index) => {
           const bullets = deck.bullets[index] || [];
           const mediaRefs = deck.media_refs?.[index] || [];
@@ -59,7 +66,7 @@ const Editor = () => {
             title: section,
             content: bullets.join('\n'),
             imageUrl: mediaRefs[0] || '',
-            diagramUrl: diagramRefs[0] || '',
+            diagramUrl: normalizeDiagramUrl(diagramRefs[0]),
             speakerNotes: deck.speaker_notes?.[index],
           };
         });
@@ -99,12 +106,12 @@ const Editor = () => {
     setPresentation(updated);
   };
 
-  const updateSlide = (field: keyof Slide, value: string) => {
+  const updateSlide = (index: number, field: keyof Slide, value: string) => {
     if (!presentation) return;
 
     const updatedSlides = [...presentation.slides];
-    updatedSlides[currentSlideIndex] = {
-      ...updatedSlides[currentSlideIndex],
+    updatedSlides[index] = {
+      ...updatedSlides[index],
       [field]: value,
     };
 
@@ -126,7 +133,7 @@ const Editor = () => {
     setCurrentSlideIndex(updatedSlides.length - 1);
   };
 
-  const deleteSlide = () => {
+  const deleteSlide = (targetIndex?: number) => {
     if (!presentation || presentation.slides.length <= 1) {
       toast({
         title: 'Error',
@@ -136,26 +143,21 @@ const Editor = () => {
       return;
     }
 
-    const updatedSlides = presentation.slides.filter((_, i) => i !== currentSlideIndex);
+    const index = targetIndex ?? currentSlideIndex;
+    const updatedSlides = presentation.slides.filter((_, i) => i !== index);
     savePresentation({ ...presentation, slides: updatedSlides });
-    setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1));
+    setCurrentSlideIndex(Math.max(0, index - 1));
   };
 
-  const handleExportClick = () => {
-    setExportDialogOpen(true);
-  };
-
-  const exportPresentation = async (format: 'pptx' | 'pdf') => {
+  const exportPresentation = async () => {
     if (!id) return;
 
     setIsExporting(true);
-    setExportDialogOpen(false);
     try {
-      const userName = user?.name || 'user';
-      await exportDeck(id, format, userName);
+      await exportDeck(id);
       toast({
         title: 'Success',
-        description: `Presentation downloaded as ${format.toUpperCase()}!`,
+        description: 'Presentation exported successfully!',
       });
     } catch (err) {
       toast({
@@ -191,7 +193,7 @@ const Editor = () => {
           title: section,
           content: bullets.join('\n'),
           imageUrl: mediaRefs[0] || '',
-          diagramUrl: diagramRefs[0] || '',
+          diagramUrl: normalizeDiagramUrl(diagramRefs[0]),
           speakerNotes: deck.speaker_notes?.[index],
         };
       });
@@ -209,6 +211,24 @@ const Editor = () => {
       });
     } finally {
       setIsGeneratingMedia(false);
+    }
+  };
+
+  const handleDownloadImages = async () => {
+    if (!id) return;
+
+    try {
+      await downloadDeckImages(id);
+      toast({
+        title: 'Success',
+        description: 'Downloading all images used in this deck as a ZIP file.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Failed to download images',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -234,7 +254,7 @@ const Editor = () => {
           title: section,
           content: bullets.join('\n'),
           imageUrl: mediaRefs[0] || '',
-          diagramUrl: diagramRefs[0] || '',
+          diagramUrl: normalizeDiagramUrl(diagramRefs[0]),
           speakerNotes: deck.speaker_notes?.[index],
         };
       });
@@ -257,12 +277,18 @@ const Editor = () => {
     if (!id) return;
 
     try {
-      // Request quiz generation and auto-download PDF
-      await generateQuiz(id, 'demo-user', undefined, undefined, 'pdf');
-      toast({
-        title: 'Success',
-        description: 'Quiz generated and downloading as PDF.',
-      });
+      const result = await generateQuiz(id, 'demo-user');
+      if (result && result.quiz_ids) {
+        toast({
+          title: 'Success',
+          description: `Quiz generated! Quiz IDs: ${result.quiz_ids.join(', ')}`,
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: 'Quiz generated and downloaded!',
+        });
+      }
     } catch (err) {
       toast({
         title: 'Error',
@@ -282,6 +308,46 @@ const Editor = () => {
     setAiPrompt('');
   };
 
+  const handleSlideClick = (index: number, event: React.MouseEvent) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('[data-editable]')) return;
+    setCurrentSlideIndex(index);
+  };
+
+  // Scroll to current slide when it changes
+  useEffect(() => {
+    if (presentation && isSidebarOpen) {
+      const slideElement = document.getElementById(`slide-thumbnail-${currentSlideIndex}`);
+      if (slideElement) {
+        slideElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [currentSlideIndex, presentation, isSidebarOpen]);
+
+  // Keyboard controls when in presentation mode
+  useEffect(() => {
+    if (!isPresenting) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!presentation) return;
+      if (event.key === 'Escape') {
+        setIsPresenting(false);
+        return;
+      }
+      if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+        setCurrentSlideIndex((prev) =>
+          Math.min(prev + 1, presentation.slides.length - 1),
+        );
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+        setCurrentSlideIndex((prev) => Math.max(prev - 1, 0));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPresenting, presentation]);
+
   if (isLoading || !presentation) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -293,208 +359,399 @@ const Editor = () => {
     );
   }
 
-  const currentSlide = presentation.slides[currentSlideIndex];
-
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex">
       <TopBar />
-      
-      <div className="container mx-auto px-4 pt-20 pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Slide Preview */}
-          <div className="lg:col-span-2 space-y-4 pt-9">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold">Preview</h2>
-              <div className="flex gap-2">
+
+      {/* Left Sidebar */}
+      {isSidebarOpen && (
+        <div className="fixed left-0 top-20 h-[calc(100vh-6rem)] w-80 bg-card border-r border-border z-20 flex flex-col">
+          {/* Top Bar */}
+          <div className="flex items-center justify-between p-3 border-b border-border bg-card">
+            <div className="flex items-center gap-2">
+              <p>Pages</p>
+              {/* <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 ${viewMode === 'filmstrip' ? 'bg-muted' : ''}`}
+                onClick={() => setViewMode('filmstrip')}
+                title="Filmstrip view"
+              >
+                <Film className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 ${viewMode === 'list' ? 'bg-muted' : ''}`}
+                onClick={() => setViewMode('list')}
+                title="List view"
+              >
+                <List className="h-4 w-4" />
+              </Button> */}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative">
                 <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1))}
-                  disabled={currentSlideIndex === 0}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-3 text-sm"
+                  onClick={addSlide}
                 >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="px-4 py-2 border border-border rounded-md text-sm">
-                  {currentSlideIndex + 1} / {presentation.slides.length}
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentSlideIndex(Math.min(presentation.slides.length - 1, currentSlideIndex + 1))}
-                  disabled={currentSlideIndex === presentation.slides.length - 1}
-                >
-                  <ChevronRight className="h-4 w-4" />
+                  <Plus className="h-4 w-4 mr-1" />
+                  New
                 </Button>
               </div>
-            </div>
-
-            {/* <div className="aspect-video bg-card border-2 border-border rounded-2xl p-8 flex flex-col items-center justify-center text-center">
-              <h1 className="text-5xl font-bold mb-6">{currentSlide.title}</h1>
-              <p className="text-lg text-muted-foreground max-w-2xl">{currentSlide.content}</p> */}
-            <div className="aspect-video bg-card border-2 border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center relative overflow-hidden">
-              <h1 className="text-5xl font-bold mb-6 z-10">{currentSlide.title}</h1>
-              <p className="text-lg text-muted-foreground max-w-2xl z-10 whitespace-pre-line">{currentSlide.content}</p>
-              
-              {/* Display generated image if available */}
-              {currentSlide.imageUrl && (
-                <div className="absolute inset-0 opacity-20 z-0">
-                  <img 
-                    src={currentSlide.imageUrl} 
-                    alt={currentSlide.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-              
-              {/* Display diagram if available */}
-              {currentSlide.diagramUrl && (
-                <div className="absolute bottom-4 right-4 w-32 h-32 border border-border rounded-lg bg-background/80 p-2 z-10">
-                  <img 
-                    src={currentSlide.diagramUrl} 
-                    alt="Diagram"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2 flex-wrap">
-              <Button onClick={addSlide} variant="outline" className="flex-1 min-w-[120px]">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Slide
-              </Button>
-              <Button onClick={deleteSlide} variant="outline" className="flex-1 min-w-[120px]">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-              <Button 
-                onClick={handleGenerateMedia} 
-                variant="outline" 
-                className="flex-1 min-w-[120px]"
-                disabled={isGeneratingMedia}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setIsSidebarOpen(false)}
+                title="Close sidebar"
               >
-                {isGeneratingMedia ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Image className="h-4 w-4 mr-2" />
-                )}
-                Generate Media
-              </Button>
-              <Button onClick={handleExportClick} className="flex-1 min-w-[120px]" disabled={isExporting}>
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Export
-              </Button>
-            </div>
-
-            {/* AI Features */}
-            <div className="flex gap-2 flex-wrap pt-2 border-t border-border">
-              <Button onClick={handleGenerateNotes} variant="outline" size="sm" className="flex-1">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Generate Notes
-              </Button>
-              <Button onClick={handleGenerateQuiz} variant="outline" size="sm" className="flex-1">
-                <Network className="h-4 w-4 mr-2" />
-                Generate Quiz
+                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Editor Panel */}
-          <div className="lg:col-span-1 space-y-6 pt-9">
-            <h2 className="text-2xl font-bold">Edit Slide</h2>
-            
-            <div className="space-y-4 bg-card border border-border rounded-2xl p-6">
-              <div className="space-y-2">
-                <Label>Title</Label>
-                <Input
-                  value={currentSlide.title}
-                  onChange={(e) => updateSlide('title', e.target.value)}
-                  className="text-lg font-semibold"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Content</Label>
-                <Textarea
-                  value={currentSlide.content}
-                  onChange={(e) => updateSlide('content', e.target.value)}
-                  className="min-h-[200px] resize-none"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Image URL (Optional)</Label>
-                <Input
-                  value={currentSlide.imageUrl}
-                  onChange={(e) => updateSlide('imageUrl', e.target.value)}
-                  placeholder="https://..."
-                />
-                {currentSlide.imageUrl && (
-                  <div className="mt-2 rounded-lg overflow-hidden border border-border">
-                    <img src={currentSlide.imageUrl} alt="Slide image" className="w-full h-32 object-cover" />
-                  </div>
-                )}
-              </div>
-
-              {currentSlide.diagramUrl && (
-                <div className="space-y-2">
-                  <Label>Diagram</Label>
-                  <div className="rounded-lg overflow-hidden border border-border">
-                    <img src={currentSlide.diagramUrl} alt="Diagram" className="w-full h-48 object-contain bg-background" />
-                  </div>
+          {/* Slide Thumbnails */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {presentation.slides.map((slide, index) => (
+              <div
+                key={slide.id}
+                id={`slide-thumbnail-${index}`}
+                className={`relative cursor-pointer rounded-lg border-2 transition-all ${
+                  currentSlideIndex === index
+                    ? 'border-primary shadow-lg shadow-primary/20'
+                    : 'border-border hover:border-muted-foreground/50'
+                }`}
+                onClick={() => {
+                  setCurrentSlideIndex(index);
+                  // Scroll to slide in main view
+                  const slideElement = document.getElementById(`main-slide-${index}`);
+                  if (slideElement) {
+                    slideElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
+              >
+                {/* Slide Number Badge */}
+                <div className="absolute bottom-2 left-2 z-10 h-6 w-6 rounded-full bg-card/90 border border-border flex items-center justify-center">
+                  <span className="text-xs font-medium text-foreground">{index + 1}</span>
                 </div>
-              )}
 
-              {currentSlide.speakerNotes && (
-                <div className="space-y-2">
-                  <Label>Speaker Notes</Label>
-                  <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
-                    <div>
-                      <strong>Main Points:</strong>
-                      <ul className="list-disc list-inside ml-2">
-                        {currentSlide.speakerNotes.main_points?.map((point: string, i: number) => (
-                          <li key={i}>{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    {currentSlide.speakerNotes.timing_notes && (
-                      <div>
-                        <strong>Timing:</strong> {currentSlide.speakerNotes.timing_notes}
+                {/* Slide Thumbnail Preview */}
+                <div className="aspect-video relative overflow-hidden rounded-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+                  {slide.imageUrl && (
+                    <img
+                      src={slide.imageUrl}
+                      alt={slide.title}
+                      className="absolute inset-0 h-full w-full object-cover opacity-30"
+                    />
+                  )}
+                  
+                  <div className="absolute inset-0 p-3 flex flex-col justify-center">
+                    <h3 className="text-xs font-semibold text-white line-clamp-2 mb-1">
+                      {slide.title || `Slide ${index + 1}`}
+                    </h3>
+                    {viewMode === 'list' && (
+                      <p className="text-[10px] text-slate-300/70 line-clamp-2">
+                        {slide.content || ''}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Selected indicator */}
+                  {currentSlideIndex === index && (
+                    <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sidebar Toggle Button (when closed) */}
+      {!isSidebarOpen && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="fixed left-4 top-20 z-20 h-10 w-10 bg-card border border-border"
+          onClick={() => setIsSidebarOpen(true)}
+          title="Open sidebar"
+        >
+          <Film className="h-5 w-5" />
+        </Button>
+      )}
+
+      {/* Main Content Area */}
+      <div className={`flex-1 transition-all ${isSidebarOpen ? 'ml-80' : 'ml-0'}`}>
+        {/* Right-side vertical toolbar */}
+        <div className="fixed right-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3 rounded-2xl border border-border bg-card/95 shadow-xl p-3">
+        
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Add slide"
+          title="Add slide"
+          onClick={addSlide}
+        >
+          <Plus className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Delete slide"
+          title="Delete slide"
+          onClick={() => deleteSlide()}
+        >
+          <Trash2 className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Download images"
+          title="Download images ZIP"
+          onClick={handleDownloadImages}
+        >
+          <Image className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Start presentation"
+          title="Start presentation"
+          onClick={() => setIsPresenting(true)}
+        >
+          <MonitorPlay className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Export"
+          title="Export"
+          onClick={exportPresentation}
+          disabled={isExporting}
+        >
+          {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Generate notes"
+          title="Generate notes"
+          onClick={handleGenerateNotes}
+        >
+          <Sparkles className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Generate quiz"
+          title="Generate quiz"
+          onClick={handleGenerateQuiz}
+        >
+          <Network className="h-5 w-5" />
+        </Button>
+      </div>
+
+      
+
+      {/* AI Chat Button - Separate below toolbar */}
+      <div className="fixed right-4 top-[calc(50%+180px)] z-30">
+        <Button
+          variant="default"
+          size="lg"
+          className="h-12 px-6 rounded-half bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 flex items-center gap-2"
+          onClick={() => {
+            toast({
+              title: 'AI Chat',
+              description: 'AI Chat feature coming soon!',
+            });
+          }}
+        >
+          <MessageSquare className="h-5 w-5" />
+          <span className="font-medium">AI Chat</span>
+        </Button>
+        
+      </div>
+
+        <div className="container mx-auto px-4 pt-20 pb-16">
+          <div className="space-y-10 pt-9">
+            {presentation.slides.map((slide, index) => (
+              <div
+                key={slide.id}
+                id={`main-slide-${index}`}
+                className={`space-y-4 transition-all ${
+                  currentSlideIndex === index ? 'ring-2 ring-primary/50 rounded-2xl p-2' : ''
+                }`}
+                onClick={(e) => {
+                  handleSlideClick(index, e);
+                  setCurrentSlideIndex(index);
+                }}
+              >
+              {/* <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Slide {index + 1} of {presentation.slides.length}</p>
+              </div> */}
+
+              <div className="aspect-video relative overflow-hidden rounded-2xl border-2 border-border bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-xl flex items-center justify-center max-w-4xl mx-auto p-4">
+                {slide.imageUrl && (
+                  <img
+                    src={slide.imageUrl}
+                    alt={slide.title}
+                    className="absolute inset-0 h-full w-full object-cover opacity-20"
+                  />
+                )}
+
+                <div className="pointer-events-none absolute inset-0">
+                  <div className="absolute -left-10 top-1/4 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+                  <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-white/5 blur-2xl" />
+                </div>
+
+                <div className="absolute left-6 top-8 h-16 w-1.5 rounded-full bg-primary shadow-[0_0_30px_rgba(59,130,246,0.45)]" />
+
+                <div className="relative z-10 max-w-2xl px-6 text-center space-y-4">
+                  <p className="text-xs uppercase tracking-[0.35em] text-primary/80">Presentation Preview</p>
+                  <div className="relative">
+                    <h1
+                      className="text-3xl md:text-4xl font-bold text-white leading-tight focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-2 min-h-[3rem] relative z-10"
+                      contentEditable
+                      suppressContentEditableWarning
+                      data-editable
+                      onInput={(e) => {
+                        const text = e.currentTarget.innerText;
+                        updateSlide(index, 'title', text);
+                      }}
+                      onBlur={(e) => {
+                        const text = e.currentTarget.innerText.trim();
+                        if (!text) {
+                          e.currentTarget.innerText = '';
+                        } else {
+                          e.currentTarget.innerText = text;
+                        }
+                        updateSlide(index, 'title', text);
+                      }}
+                      spellCheck={false}
+                    >
+                      {slide.title || ''}
+                    </h1>
+                    {!slide.title && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                        <span className="text-3xl md:text-4xl font-bold text-white/50">{defaultTitle}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <p
+                      className="text-base md:text-lg text-slate-200/80 whitespace-pre-line focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-3 py-2 min-h-[4rem] relative z-10"
+                      contentEditable
+                      suppressContentEditableWarning
+                      data-editable
+                      onInput={(e) => {
+                        const text = e.currentTarget.innerText;
+                        updateSlide(index, 'content', text);
+                      }}
+                      onBlur={(e) => {
+                        const text = e.currentTarget.innerText.trim();
+                        if (!text) {
+                          e.currentTarget.innerText = '';
+                        } else {
+                          e.currentTarget.innerText = text;
+                        }
+                        updateSlide(index, 'content', text);
+                      }}
+                      spellCheck={false}
+                    >
+                      {slide.content || ''}
+                    </p>
+                    {!slide.content && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                        <span className="text-base md:text-lg text-slate-300/50">{defaultContent}</span>
                       </div>
                     )}
                   </div>
                 </div>
-              )}
-            </div>
 
-            <div className="space-y-2 bg-card border border-border rounded-2xl p-6">
-              <Label>AI Assistant</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="Ask AI to edit this slide..."
-                  onKeyDown={(e) => e.key === 'Enter' && handleAiAssist()}
-                />
-                <Button onClick={handleAiAssist} size="icon">
-                  <Send className="h-4 w-4" />
-                </Button>
+                {slide.diagramUrl && (
+                  <div className="absolute bottom-6 right-6 w-32 h-32 border border-border rounded-lg bg-background/80 p-2 shadow-lg">
+                    <img 
+                      src={slide.diagramUrl} 
+                      alt="Diagram"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                )}
               </div>
-            </div>
+
+              </div>
+            ))}
           </div>
         </div>
       </div>
-      
-      <ExportDialog
-        open={exportDialogOpen}
-        onOpenChange={setExportDialogOpen}
-        onExport={exportPresentation}
-        isExporting={isExporting}
-      />
+      {/* Fullscreen presentation mode */}
+      {isPresenting && presentation && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          <div className="flex items-center justify-between px-6 py-3 bg-black/60 text-white text-sm">
+            <div>
+              {presentation.title} &middot; Slide {currentSlideIndex + 1} of {presentation.slides.length}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="hidden md:inline text-xs text-white/70">
+                Use ← → or space, Esc to exit
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-white/40 text-white bg-transparent hover:bg-white/10"
+                onClick={() => setIsPresenting(false)}
+              >
+                Exit
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center px-4 pb-6">
+            {presentation.slides[currentSlideIndex] && (
+              <div className="w-full max-w-6xl aspect-video relative overflow-hidden rounded-3xl border border-white/20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-2xl flex items-center justify-center p-8">
+                {presentation.slides[currentSlideIndex].imageUrl && (
+                  <img
+                    src={presentation.slides[currentSlideIndex].imageUrl}
+                    alt={presentation.slides[currentSlideIndex].title}
+                    className="absolute inset-0 h-full w-full object-cover opacity-25"
+                  />
+                )}
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute -left-16 top-1/4 h-72 w-72 rounded-full bg-primary/25 blur-3xl" />
+                  <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
+                </div>
+                <div className="relative z-10 max-w-3xl text-center space-y-6">
+                  <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight">
+                    {presentation.slides[currentSlideIndex].title || 'Untitled slide'}
+                  </h1>
+                  <p className="text-lg md:text-2xl text-slate-100/85 whitespace-pre-line">
+                    {presentation.slides[currentSlideIndex].content || ''}
+                  </p>
+                </div>
+                {presentation.slides[currentSlideIndex].diagramUrl && (
+                  <div className="absolute bottom-8 right-8 w-40 h-40 border border-white/30 rounded-xl bg-black/70 p-2 shadow-xl">
+                    <img
+                      src={presentation.slides[currentSlideIndex].diagramUrl}
+                      alt="Diagram"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

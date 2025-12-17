@@ -4,9 +4,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import logging
 import base64
+import io
+import os
 
 import requests
 from bson.objectid import ObjectId
+from gridfs import GridFS
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
@@ -21,7 +24,74 @@ class PPTExporter:
 	def __init__(self):
 		self.db = get_ai_db()
 		self.slides_collection = self.db["slides"]
-	
+
+	def _capture_paragraph_style(self, paragraph) -> Dict[str, Optional[object]]:
+		"""
+		Snapshot the key visual properties from a template paragraph so we can
+		reuse them when injecting our own text. This keeps font, size, color,
+		alignment and spacing consistent with the original slide design.
+		"""
+		if paragraph is None:
+			return {}
+
+		style: Dict[str, Optional[object]] = {}
+		try:
+			font = paragraph.font
+			style["font_name"] = font.name
+			style["font_size"] = font.size
+			style["bold"] = font.bold
+			style["italic"] = font.italic
+			# color can be None or theme-based; guard for rgb
+			try:
+				if font.color is not None and getattr(font.color, "rgb", None):
+					style["font_color"] = font.color.rgb
+				else:
+					style["font_color"] = None
+			except Exception:
+				style["font_color"] = None
+
+			style["level"] = paragraph.level
+			style["alignment"] = paragraph.alignment
+			style["space_after"] = paragraph.space_after
+			style["space_before"] = paragraph.space_before
+		except Exception:
+			# Best-effort only; if anything fails we just return what we captured
+			pass
+
+		return style
+
+	def _apply_paragraph_style(self, paragraph, style: Dict[str, Optional[object]]):
+		"""Apply a previously captured style dictionary to a paragraph."""
+		if not style:
+			return
+		try:
+			font = paragraph.font
+			if "font_name" in style and style["font_name"] is not None:
+				font.name = style["font_name"]
+			if "font_size" in style and style["font_size"] is not None:
+				font.size = style["font_size"]
+			if "bold" in style and style["bold"] is not None:
+				font.bold = style["bold"]
+			if "italic" in style and style["italic"] is not None:
+				font.italic = style["italic"]
+			if "font_color" in style and style["font_color"] is not None:
+				try:
+					font.color.rgb = style["font_color"]
+				except Exception:
+					pass
+
+			if "level" in style and style["level"] is not None:
+				paragraph.level = style["level"]
+			if "alignment" in style and style["alignment"] is not None:
+				paragraph.alignment = style["alignment"]
+			if "space_after" in style and style["space_after"] is not None:
+				paragraph.space_after = style["space_after"]
+			if "space_before" in style and style["space_before"] is not None:
+				paragraph.space_before = style["space_before"]
+		except Exception:
+			# Styling issues should never break export
+			pass
+
 	def _calculate_available_space_for_image(self, slide, text_frame) -> Dict[str, float]:
 		"""
 		Calculate available space on slide for image placement based on text content.
@@ -161,9 +231,10 @@ class PPTExporter:
 	def _export_to_pdf(self, deck_id: str, user_name: str = "user") -> Tuple[bytes, str]:
 		"""Convert PPTX to PDF preserving template and formatting.
 		
-		Uses LibreOffice headless mode to convert PPTX to PDF, which preserves
-		all templates, formatting, colors, fonts, images, and layout exactly as in PPTX.
-		Falls back to reportlab if LibreOffice is not available (but warns about loss of formatting).
+		Order of converters:
+		1) Microsoft PowerPoint COM automation (Windows only, if PowerPoint installed)
+		2) LibreOffice headless (if available locally or via SOFFICE_PATH)
+		3) ReportLab fallback (loses template/layout fidelity)
 		"""
 		import re
 		import tempfile
@@ -197,13 +268,61 @@ class PPTExporter:
 		date_str = datetime.utcnow().strftime('%Y-%m-%d')
 		filename = f"{safe_title}_{safe_user}_{date_str}.pdf"
 		
-		# Try LibreOffice conversion first (preserves template and formatting)
+		# 1) Try Microsoft PowerPoint COM automation on Windows
+		if platform.system() == "Windows":
+			try:
+				return self._convert_pptx_to_pdf_powerpoint(prs, filename)
+			except Exception as ppt_com_error:
+				logger.warning(f"PowerPoint COM conversion failed: {ppt_com_error}. Trying LibreOffice next.")
+
+		# 2) Try LibreOffice conversion (preserves template and formatting)
 		try:
 			return self._convert_pptx_to_pdf_libreoffice(prs, filename)
 		except Exception as libreoffice_error:
 			logger.warning(f"LibreOffice conversion failed: {libreoffice_error}. Falling back to reportlab (template/formatting may be lost).")
-			# Fallback to reportlab (loses template but at least produces PDF)
-			return self._convert_pptx_to_pdf_reportlab(prs, title, user_name, filename)
+
+		# 3) Fallback to reportlab (loses template but at least produces PDF)
+		return self._convert_pptx_to_pdf_reportlab(prs, title, user_name, filename)
+
+	def _convert_pptx_to_pdf_powerpoint(self, prs: Presentation, filename: str) -> Tuple[bytes, str]:
+		"""Use installed Microsoft PowerPoint via COM to export PDF (Windows only)."""
+		import tempfile
+		import platform
+
+		if platform.system() != "Windows":
+			raise RuntimeError("PowerPoint COM export is only available on Windows.")
+
+		try:
+			import win32com.client  # type: ignore
+		except Exception as e:
+			raise RuntimeError(f"pywin32 not available for PowerPoint COM export: {e}")
+
+		with tempfile.TemporaryDirectory() as temp_dir:
+			pptx_path = Path(temp_dir) / "presentation.pptx"
+			pdf_path = Path(temp_dir) / "presentation.pdf"
+
+			# Save PPTX to temp
+			prs.save(str(pptx_path))
+
+			powerpoint = None
+			try:
+				powerpoint = win32com.client.Dispatch("PowerPoint.Application")
+				powerpoint.Visible = 0
+				presentation = powerpoint.Presentations.Open(str(pptx_path), WithWindow=False)
+				# 32 is the PDF format in PowerPoint SaveAs
+				presentation.SaveAs(str(pdf_path), 32)
+				presentation.Close()
+			finally:
+				if powerpoint:
+					powerpoint.Quit()
+
+			if not pdf_path.exists():
+				raise RuntimeError("PowerPoint did not produce PDF file")
+
+			with open(pdf_path, "rb") as f:
+				pdf_bytes = f.read()
+
+		return pdf_bytes, filename
 	
 	def _convert_pptx_to_pdf_libreoffice(self, prs: Presentation, filename: str) -> Tuple[bytes, str]:
 		"""Convert PPTX to PDF using LibreOffice headless mode - preserves all formatting."""
@@ -212,8 +331,11 @@ class PPTExporter:
 		import shutil
 		import platform
 		
-		# Check if LibreOffice is available
-		if platform.system() == "Windows":
+		# Check if LibreOffice is available. Allow overriding via SOFFICE_PATH.
+		env_soffice = os.getenv("SOFFICE_PATH")
+		if env_soffice and Path(env_soffice).exists():
+			soffice = env_soffice
+		elif platform.system() == "Windows":
 			# Common LibreOffice paths on Windows
 			libreoffice_paths = [
 				r"C:\Program Files\LibreOffice\program\soffice.exe",
@@ -481,9 +603,50 @@ class PPTExporter:
 			raise FileNotFoundError("Slide deck not found")
 
 		template_path = deck.get("template_path") or deck.get("metadata", {}).get("template_path")
-		if template_path and Path(template_path).exists():
+		
+		# Check if template is stored in MongoDB (prefixed with "db:")
+		if template_path and template_path.startswith("db:"):
+			# Load template from MongoDB
+			template_id = template_path.replace("db:", "")
+			templates_collection = self.db["templates"]
+			template_doc = templates_collection.find_one({"templateId": template_id})
+			
+			if template_doc:
+				try:
+					storage_type = template_doc.get("storage_type", "base64")
+					
+					if storage_type == "gridfs":
+						# Load from GridFS
+						fs = GridFS(self.db, collection="templates_fs")
+						gridfs_file_id = template_doc.get("template_file_id")
+						
+						if gridfs_file_id:
+							gridfs_file = fs.get(ObjectId(gridfs_file_id))
+							template_bytes = gridfs_file.read()
+							prs = Presentation(io.BytesIO(template_bytes))
+							logger.info(f"Loaded template '{template_id}' from GridFS ({len(template_bytes)} bytes)")
+						else:
+							raise ValueError("GridFS file ID not found")
+					elif template_doc.get("template_file"):
+						# Load from base64
+						template_base64 = template_doc["template_file"]
+						template_bytes = base64.b64decode(template_base64)
+						prs = Presentation(io.BytesIO(template_bytes))
+						logger.info(f"Loaded template '{template_id}' from MongoDB base64 ({len(template_bytes)} bytes)")
+					else:
+						raise ValueError("Template file data not found")
+						
+				except Exception as e:
+					logger.warning(f"Failed to load template from DB: {e}, using default template")
+					prs = Presentation()
+			else:
+				logger.warning(f"Template '{template_id}' not found in MongoDB, using default template")
+				prs = Presentation()
+		elif template_path and Path(template_path).exists():
+			# Fallback to file system
 			prs = Presentation(template_path)
 		else:
+			# No template specified, use default
 			prs = Presentation()
 
 		# Title slide – overwrite the first slide in the template if present,
@@ -543,6 +706,13 @@ class PPTExporter:
 			except Exception:
 				box = slide.shapes.add_textbox(Inches(1.0), Inches(1.5), Inches(8.0), Inches(4.5))
 				text_frame = box.text_frame
+
+			# Capture the template's paragraph style before clearing so we can
+			# re-use its font, size, spacing, etc. for all generated content.
+			template_paragraph = text_frame.paragraphs[0] if text_frame.paragraphs else None
+			template_style = self._capture_paragraph_style(template_paragraph)
+
+			# Now clear out any existing template text so we don't stack on top.
 			text_frame.clear()
 			
 			# CRITICAL: Use expanded content (after 3 passes) instead of bullets
@@ -560,18 +730,17 @@ class PPTExporter:
 				for i, sentence in enumerate(sentences):
 					if sentence.strip():
 						p = text_frame.paragraphs[0] if i == 0 else text_frame.add_paragraph()
+						# Apply the original template styling so the new text looks
+						# like it belongs to the slide design.
+						self._apply_paragraph_style(p, template_style)
 						p.text = sentence.strip()
-						p.font.size = Pt(16)
-						p.level = 0
-						p.space_after = Pt(6)
 			else:
 				# Fallback to bullets if expanded content not available
 				slide_bullets = bullets[idx] if idx < len(bullets) else []
 				for i, bullet in enumerate(slide_bullets):
 					p = text_frame.paragraphs[0] if i == 0 else text_frame.add_paragraph()
+					self._apply_paragraph_style(p, template_style)
 					p.text = bullet
-					p.font.size = Pt(18)
-					p.level = 0
 
 			# Image placeholder captions (fallback text when no media available)
 			placeholders = image_placeholders[idx] if idx < len(image_placeholders) else []
@@ -643,6 +812,91 @@ class PPTExporter:
 				notes_frame = slide.notes_slide.notes_text_frame
 				notes_frame.clear()
 				notes_frame.text = notes_text.strip()
+
+		# Smart slide removal: Keep important conclusion slides (Thank You, Questions, etc.) and remove middle slides
+		# Strategy: Keep title (0) + user content (1 to len(sections)) + important end slides (last 1-2)
+		def _is_important_conclusion_slide(slide) -> bool:
+			"""Detect if slide is an important conclusion slide (Thank You, Questions, etc.)"""
+			conclusion_keywords = [
+				"thank you", "thanks", "thank", "questions", "q&a", "qa", 
+				"conclusion", "conclusions", "summary", "contact", "reach out",
+				"any questions", "questions?", "thank", "appreciation"
+			]
+			try:
+				# Check title
+				if slide.shapes.title and slide.shapes.title.text:
+					title_text = slide.shapes.title.text.lower().strip()
+					if any(keyword in title_text for keyword in conclusion_keywords):
+						return True
+				# Check all text shapes
+				for shape in slide.shapes:
+					if hasattr(shape, "text") and shape.text:
+						text = shape.text.lower().strip()
+						if any(keyword in text for keyword in conclusion_keywords):
+							return True
+			except:
+				pass
+			return False
+		
+		# Detect important conclusion slides (usually last 1-2 slides)
+		important_end_slides = []
+		for i in range(max(0, len(prs.slides) - 2), len(prs.slides)):
+			if i > 0 and _is_important_conclusion_slide(prs.slides[i]):
+				important_end_slides.append(i)
+		
+		# Calculate what we need: title (1) + user content (len(sections)) + important end slides
+		num_important_end = len(important_end_slides)
+		total_needed = 1 + len(sections) + num_important_end
+		
+		if len(prs.slides) > total_needed:
+			slides_to_remove = len(prs.slides) - total_needed
+			logger.info(f"Template has {len(prs.slides)} slides, need {total_needed} (title + {len(sections)} content + {num_important_end} conclusion). Removing {slides_to_remove} middle slide(s).")
+			
+			# Remove middle slides, keeping: title (0), user content area, and important end slides
+			# We'll remove slides from the middle range, not from the end
+			try:
+				sldIdLst = prs.slides._sldIdLst
+				# Calculate which slides to remove (middle ones, not end ones)
+				# Keep: slide 0 (title), slides 1 to len(sections) (user content), and important end slides
+				slides_to_keep_indices = set([0])  # Title slide
+				slides_to_keep_indices.update(range(1, 1 + len(sections)))  # User content slides
+				slides_to_keep_indices.update(important_end_slides)  # Important conclusion slides
+				
+				# Remove slides that are NOT in the keep list (work backwards to avoid index issues)
+				indices_to_remove = []
+				for i in range(len(prs.slides) - 1, -1, -1):
+					if i not in slides_to_keep_indices:
+						indices_to_remove.append(i)
+				
+				# Remove slide references (work backwards)
+				for idx in sorted(indices_to_remove, reverse=True):
+					if idx < len(sldIdLst):
+						try:
+							sldIdLst.remove(sldIdLst[idx])
+						except:
+							pass
+				
+				logger.info(f"Successfully removed {len(indices_to_remove)} middle slide(s), kept {num_important_end} important conclusion slide(s).")
+			except Exception as e:
+				# If removal fails, at least clear the content of middle slides (keep end slides intact)
+				logger.warning(f"Could not remove slide references: {e}. Clearing content of middle slides instead.")
+				slides_to_keep_indices = set([0])
+				slides_to_keep_indices.update(range(1, 1 + len(sections)))
+				slides_to_keep_indices.update(important_end_slides)
+				
+				for i in range(len(prs.slides)):
+					if i not in slides_to_keep_indices:
+						try:
+							extra_slide = prs.slides[i]
+							# Clear all shapes on the extra slide
+							for shape in list(extra_slide.shapes):
+								try:
+									sp = shape._element
+									sp.getparent().remove(sp)
+								except:
+									pass
+						except Exception as e2:
+							logger.debug(f"Could not clear slide {i}: {e2}")
 
 		# Generate filename: Topic_user_date.pptx
 		title = deck.get("title", "Presentation")

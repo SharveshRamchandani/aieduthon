@@ -74,7 +74,7 @@ class QuizGenerationAgent:
 			
 			# Analyze slide content
 			content_analysis = self._analyze_slide_content(deck)
-			
+				
 			# Generate quiz based on type
 			if quiz_type == "per_topic":
 				quizzes = self._generate_per_topic_quizzes(deck, content_analysis, difficulty, num_questions)

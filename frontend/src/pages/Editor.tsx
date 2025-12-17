@@ -311,32 +311,69 @@ const Editor = () => {
 
       {/* Right-side vertical toolbar */}
       <div className="fixed right-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3 rounded-2xl border border-border bg-card/95 shadow-xl p-3">
-        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 hover:bg-muted" aria-label="Search">
-          <Search className="h-5 w-5" />
+        
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Add slide"
+          title="Add slide"
+          onClick={addSlide}
+        >
+          <Plus className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 hover:bg-muted" aria-label="Text">
-          <Type className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Delete slide"
+          title="Delete slide"
+          onClick={deleteSlide}
+        >
+          <Trash2 className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 hover:bg-muted" aria-label="Images">
-          <Image className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Generate media"
+          title="Generate media"
+          onClick={handleGenerateMedia}
+          disabled={isGeneratingMedia}
+        >
+          {isGeneratingMedia ? <Loader2 className="h-5 w-5 animate-spin" /> : <Image className="h-5 w-5" />}
         </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 hover:bg-muted" aria-label="Layouts">
-          <LayoutGrid className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Export"
+          title="Export"
+          onClick={exportPresentation}
+          disabled={isExporting}
+        >
+          {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
         </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 hover:bg-muted" aria-label="Diagrams">
-          <Orbit className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Generate notes"
+          title="Generate notes"
+          onClick={handleGenerateNotes}
+        >
+          <Sparkles className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 hover:bg-muted" aria-label="Charts">
-          <BarChart3 className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 hover:bg-muted" aria-label="Media">
-          <Film className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 hover:bg-muted" aria-label="Embed">
-          <Globe2 className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 hover:bg-muted" aria-label="Forms">
-          <PenSquare className="h-5 w-5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Generate quiz"
+          title="Generate quiz"
+          onClick={handleGenerateQuiz}
+        >
+          <Network className="h-5 w-5" />
         </Button>
       </div>
 
@@ -414,7 +451,7 @@ const Editor = () => {
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2 items-center justify-start">
+            {/* <div className="flex flex-wrap gap-2 items-center justify-start">
               <Button onClick={addSlide} variant="ghost" size="sm" className="border border-border bg-card hover:bg-muted/60">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Slide
@@ -453,7 +490,7 @@ const Editor = () => {
                 <Network className="h-4 w-4 mr-2" />
                 Quiz
               </Button>
-            </div>
+            </div> */}
 
             {currentSlide.speakerNotes && (
               <div className="space-y-2 bg-card border border-border rounded-2xl p-6">

@@ -109,7 +109,7 @@ class SpeakerNotesAgent:
 		metadata = deck.get("metadata", {})
 		
 		# Determine audience level
-		if not audience_level:
+		if not audience_level:	
 			audience_level = metadata.get("target_audience", "intermediate")
 			if audience_level in ["school", "elementary"]:
 				audience_level = "beginner"

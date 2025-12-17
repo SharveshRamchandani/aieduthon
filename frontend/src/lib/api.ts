@@ -196,6 +196,28 @@ export async function generateMediaForDeck(
   return response.json();
 }
 
+// Download all deck images as ZIP
+export async function downloadDeckImages(deckId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/slides/${deckId}/images-zip`, {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || 'Failed to download deck images');
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `deck_${deckId}_images.zip`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
 // Export Deck to PPTX or PDF
 export async function exportDeck(deckId: string, format: 'pptx' | 'pdf' = 'pptx', userName: string = 'user', outputDir?: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/slides/${deckId}/export`, {

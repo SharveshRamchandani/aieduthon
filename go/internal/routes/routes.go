@@ -48,5 +48,7 @@ func Routes(r *gin.Engine) {
 			claims := c.MustGet("claims").(map[string]any)
 			c.JSON(200, gin.H{"msg": "hello protected", "claims": claims})
 		})
+
+		authorized.POST("/orchestrate", handlers.Orchestrate)
 	}
 }

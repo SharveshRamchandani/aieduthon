@@ -35,8 +35,6 @@ const Editor = () => {
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const contentRef = useRef<HTMLParagraphElement>(null);
   const defaultTitle = 'Agile Methodology in Software Development: Embracing Change for Success';
   const defaultContent = 'Discover how Agile transforms software development through flexibility, collaboration, and continuous improvement';
 
@@ -94,28 +92,17 @@ const Editor = () => {
     loadDeck();
   }, [id, toast]);
 
-  useEffect(() => {
-    if (!presentation) return;
-    const slide = presentation.slides[currentSlideIndex];
-    if (titleRef.current) {
-      titleRef.current.innerText = slide?.title || defaultTitle;
-    }
-    if (contentRef.current) {
-      contentRef.current.innerText = slide?.content || defaultContent;
-    }
-  }, [presentation, currentSlideIndex]);
-
   const savePresentation = (updated: Presentation) => {
     localStorage.setItem(`presentation_${id}`, JSON.stringify(updated));
     setPresentation(updated);
   };
 
-  const updateSlide = (field: keyof Slide, value: string) => {
+  const updateSlide = (index: number, field: keyof Slide, value: string) => {
     if (!presentation) return;
 
     const updatedSlides = [...presentation.slides];
-    updatedSlides[currentSlideIndex] = {
-      ...updatedSlides[currentSlideIndex],
+    updatedSlides[index] = {
+      ...updatedSlides[index],
       [field]: value,
     };
 
@@ -137,7 +124,7 @@ const Editor = () => {
     setCurrentSlideIndex(updatedSlides.length - 1);
   };
 
-  const deleteSlide = () => {
+  const deleteSlide = (targetIndex?: number) => {
     if (!presentation || presentation.slides.length <= 1) {
       toast({
         title: 'Error',
@@ -147,9 +134,10 @@ const Editor = () => {
       return;
     }
 
-    const updatedSlides = presentation.slides.filter((_, i) => i !== currentSlideIndex);
+    const index = targetIndex ?? currentSlideIndex;
+    const updatedSlides = presentation.slides.filter((_, i) => i !== index);
     savePresentation({ ...presentation, slides: updatedSlides });
-    setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1));
+    setCurrentSlideIndex(Math.max(0, index - 1));
   };
 
   const exportPresentation = async () => {
@@ -276,6 +264,8 @@ const Editor = () => {
     }
   };
 
+  const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
+
   const handleAiAssist = () => {
     if (!aiPrompt.trim()) return;
     
@@ -284,6 +274,20 @@ const Editor = () => {
       description: 'AI editing features coming soon!',
     });
     setAiPrompt('');
+  };
+
+  const handleSlideClick = (index: number, event: React.MouseEvent) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('[data-editable]')) return;
+    setCurrentSlideIndex(index);
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentSlideIndex(index);
+    const el = slideRefs.current[index];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+    }
   };
 
   if (isLoading || !presentation) {
@@ -297,22 +301,12 @@ const Editor = () => {
     );
   }
 
-  const currentSlide = presentation.slides[currentSlideIndex];
-
-  const commitEditableChange = (field: keyof Slide, ref: React.RefObject<HTMLElement>) => {
-    if (!ref.current) return;
-    const text = ref.current.innerText.trim();
-    updateSlide(field, text);
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
 
       {/* Right-side vertical toolbar */}
-      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3 rounded-2xl border border-border bg-card/95 shadow-xl p-3">
-        
-        
+      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-xl p-3 backdrop-blur">
         <Button
           variant="ghost"
           size="icon"
@@ -329,7 +323,7 @@ const Editor = () => {
           className="h-10 w-10 text-slate-200 hover:bg-muted"
           aria-label="Delete slide"
           title="Delete slide"
-          onClick={deleteSlide}
+          onClick={() => deleteSlide()}
         >
           <Trash2 className="h-5 w-5" />
         </Button>
@@ -377,144 +371,147 @@ const Editor = () => {
         </Button>
       </div>
 
-      <div className="container mx-auto px-4 pt-20 pb-16">
-        <div className="space-y-8 pt-9">
-          {/* Slide Preview with inline editing */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-             
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1))}
-                  disabled={currentSlideIndex === 0}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="px-4 py-2 border border-border rounded-md text-sm">
-                  {currentSlideIndex + 1} / {presentation.slides.length}
-                </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentSlideIndex(Math.min(presentation.slides.length - 1, currentSlideIndex + 1))}
-                  disabled={currentSlideIndex === presentation.slides.length - 1}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+      {/* Left filmstrip */}
+      <div className="fixed left-4 top-24 bottom-6 z-20 w-64 overflow-hidden rounded-3xl border border-border bg-card shadow-2xl flex flex-col">
+        <div className="px-3 pt-3 pb-2 flex items-center gap-2">
+          {/* <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Filmstrip view">
+            <Film className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="List view">
+            <LayoutGrid className="h-4 w-4" />
+          </Button> */}
+          <div className="flex-2" />
+          
+          <Button variant="ghost" className="h-9 px-3" aria-label="New slide" onClick={addSlide}>
+            Pages
+          </Button>
 
-            <div className="aspect-video relative overflow-hidden rounded-2xl border-2 border-border bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-xl flex items-center justify-center">
-              {currentSlide.imageUrl && (
-                <img
-                  src={currentSlide.imageUrl}
-                  alt={currentSlide.title}
-                  className="absolute inset-0 h-full w-full object-cover opacity-20"
-                />
-              )}
-
-              <div className="pointer-events-none absolute inset-0">
-                <div className="absolute -left-10 top-1/4 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
-                <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-white/5 blur-2xl" />
-              </div>
-
-              <div className="absolute left-6 top-8 h-16 w-1.5 rounded-full bg-primary shadow-[0_0_30px_rgba(59,130,246,0.45)]" />
-
-              <div className="relative z-10 max-w-3xl px-8 text-center space-y-4">
-                <p className="text-xs uppercase tracking-[0.35em] text-primary/80">Presentation Preview</p>
-                <h1
-                  ref={titleRef}
-                  className="text-4xl md:text-5xl font-bold text-white leading-tight focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-2"
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={() => commitEditableChange('title', titleRef)}
-                />
-                <p
-                  ref={contentRef}
-                  className="text-lg md:text-xl text-slate-200/80 whitespace-pre-line focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-3 py-2"
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={() => commitEditableChange('content', contentRef)}
-                />
-              </div>
-
-              {currentSlide.diagramUrl && (
-                <div className="absolute bottom-6 right-6 w-32 h-32 border border-border rounded-lg bg-background/80 p-2 shadow-lg">
-                  <img 
-                    src={currentSlide.diagramUrl} 
-                    alt="Diagram"
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* <div className="flex flex-wrap gap-2 items-center justify-start">
-              <Button onClick={addSlide} variant="ghost" size="sm" className="border border-border bg-card hover:bg-muted/60">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Slide
-              </Button>
-              <Button onClick={deleteSlide} variant="ghost" size="sm" className="border border-border bg-card hover:bg-muted/60">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-              <Button 
-                onClick={handleGenerateMedia} 
-                variant="ghost" 
-                size="sm"
-                className="border border-border bg-card hover:bg-muted/60"
-                disabled={isGeneratingMedia}
+          <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Add slide" onClick={addSlide}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="px-3 pb-3 flex-1 overflow-y-auto space-y-3">
+          {presentation.slides.map((slide, index) => {
+            const isActive = currentSlideIndex === index;
+            const thumbStyle = slide.imageUrl
+              ? { backgroundImage: `url(${slide.imageUrl})` }
+              : { backgroundImage: 'linear-gradient(135deg, #1f2937, #0f172a)' };
+            return (
+              <button
+                key={slide.id}
+                onClick={() => goToSlide(index)}
+                className={`w-full text-left rounded-2xl border transition overflow-hidden group ${
+                  isActive ? 'border-primary shadow-lg ring-1 ring-primary/50 bg-primary/5' : 'border-border hover:border-primary/60 bg-card'
+                }`}
               >
-                {isGeneratingMedia ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Image className="h-4 w-4 mr-2" />
-                )}
-                Media
-              </Button>
-              <Button onClick={exportPresentation} variant="ghost" size="sm" className="border border-border bg-card hover:bg-muted/60" disabled={isExporting}>
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Export
-              </Button>
-              <Button onClick={handleGenerateNotes} variant="ghost" size="sm" className="border border-border bg-card hover:bg-muted/60">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Notes
-              </Button>
-              <Button onClick={handleGenerateQuiz} variant="ghost" size="sm" className="border border-border bg-card hover:bg-muted/60">
-                <Network className="h-4 w-4 mr-2" />
-                Quiz
-              </Button>
-            </div> */}
-
-            {currentSlide.speakerNotes && (
-              <div className="space-y-2 bg-card border border-border rounded-2xl p-6">
-                <div className="space-y-2">
-                  <Label>Speaker Notes</Label>
-                  <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
-                    <div>
-                      <strong>Main Points:</strong>
-                      <ul className="list-disc list-inside ml-2">
-                        {currentSlide.speakerNotes.main_points?.map((point: string, i: number) => (
-                          <li key={i}>{point}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    {currentSlide.speakerNotes.timing_notes && (
-                      <div>
-                        <strong>Timing:</strong> {currentSlide.speakerNotes.timing_notes}
-                      </div>
-                    )}
+                <div
+                  className="relative h-28 w-full bg-cover bg-center"
+                  style={thumbStyle}
+                >
+                  <div className="absolute inset-0 bg-black/25 group-hover:bg-black/15 transition" />
+                  <div className="absolute left-2 bottom-2 h-7 w-7 rounded-md bg-background/90 text-xs font-semibold text-foreground flex items-center justify-center">
+                    {index + 1}
                   </div>
                 </div>
+                <div className="px-3 py-2 bg-card">
+                  <p className="text-sm font-semibold truncate">{slide.title || `Slide ${index + 1}`}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{slide.content || 'Add content'}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 pt-20 pb-16 pl-0 md:pl-[19rem]">
+        <div className="space-y-10 pt-9">
+          {presentation.slides.map((slide, index) => (
+            <div
+              key={slide.id}
+              className="space-y-4"
+              onClick={(e) => handleSlideClick(index, e)}
+            >
+              {/* <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Slide {index + 1} of {presentation.slides.length}</p>
+              </div> */}
+
+              <div className="aspect-video relative overflow-hidden rounded-2xl border-2 border-border bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-xl flex items-center justify-center max-w-4xl mx-auto p-4">
+                {slide.imageUrl && (
+                  <img
+                    src={slide.imageUrl}
+                    alt={slide.title}
+                    className="absolute inset-0 h-full w-full object-cover opacity-20"
+                  />
+                )}
+
+                <div className="pointer-events-none absolute inset-0">
+                  <div className="absolute -left-10 top-1/4 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+                  <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-white/5 blur-2xl" />
+                </div>
+
+                <div className="absolute left-6 top-8 h-16 w-1.5 rounded-full bg-primary shadow-[0_0_30px_rgba(59,130,246,0.45)]" />
+
+                <div className="relative z-10 max-w-2xl px-6 text-center space-y-4">
+                  <p className="text-xs uppercase tracking-[0.35em] text-primary/80">Presentation Preview</p>
+                  <h1
+                    className="text-3xl md:text-4xl font-bold text-white leading-tight focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-2"
+                    contentEditable
+                    suppressContentEditableWarning
+                    data-editable
+                    onInput={(e) => updateSlide(index, 'title', e.currentTarget.innerText)}
+                    onBlur={(e) => updateSlide(index, 'title', e.currentTarget.innerText.trim())}
+                    spellCheck={false}
+                  >
+                    {slide.title || defaultTitle}
+                  </h1>
+                  <p
+                    className="text-base md:text-lg text-slate-200/80 whitespace-pre-line focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-3 py-2"
+                    contentEditable
+                    suppressContentEditableWarning
+                    data-editable
+                    onInput={(e) => updateSlide(index, 'content', e.currentTarget.innerText)}
+                    onBlur={(e) => updateSlide(index, 'content', e.currentTarget.innerText.trim())}
+                    spellCheck={false}
+                  >
+                    {slide.content || defaultContent}
+                  </p>
+                </div>
+
+                {slide.diagramUrl && (
+                  <div className="absolute bottom-6 right-6 w-32 h-32 border border-border rounded-lg bg-background/80 p-2 shadow-lg">
+                    <img 
+                      src={slide.diagramUrl} 
+                      alt="Diagram"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+
+              {slide.speakerNotes && (
+                <div className="space-y-2 bg-card border border-border rounded-2xl p-6">
+                  <div className="space-y-2">
+                    <Label>Speaker Notes</Label>
+                    <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
+                      <div>
+                        <strong>Main Points:</strong>
+                        <ul className="list-disc list-inside ml-2">
+                          {slide.speakerNotes.main_points?.map((point: string, i: number) => (
+                            <li key={i}>{point}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      {slide.speakerNotes.timing_notes && (
+                        <div>
+                          <strong>Timing:</strong> {slide.speakerNotes.timing_notes}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>

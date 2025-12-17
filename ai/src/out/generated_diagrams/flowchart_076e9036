@@ -1,0 +1,11 @@
+// The Definitive Bernoulli Equation: Deconstructing the Energy Conservation Statement: The mathematical expression is formally written as $P + \frac{1}{2}\rho v^2 + \rho gh = \text{Constant}$, representing the total energy density along a streamline. The term $P$ represents the static pressure, which is the thermodynamic pressure exerted by the fluid, measured perpendicular to the flow direction at any specific point.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	process [label="The Definitive Bernoulli Equation: Deconstructing "]
+	end [label=End]
+	start -> process
+	process -> end
+}

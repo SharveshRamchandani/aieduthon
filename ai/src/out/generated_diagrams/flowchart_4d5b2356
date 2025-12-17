@@ -1,0 +1,17 @@
+// Understanding the Boundaries: Key Assumptions and Inherent Limitations of the Theorem: The theorem assumes the fluid is entirely non-viscous, meaning there is absolutely no internal friction or shear stress acting between adjacent layers of the fluid during motion. The flow must be strictly steady, implying that the velocity, pressure, and density at every point in the flow field remain constant over the entire period of observation.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label="Understanding Theorem Boundaries"]
+	assumptionviscosity [label="Assumption: Fluid is Non-Viscous (No internal friction/shear stress)"]
+	limitationviscosity [label="Limitation: Real fluids always have viscosity (friction)"]
+	assumptionsteady [label="Assumption: Flow is Strictly Steady (Velocity, Pressure, Density constant over time at every point)"]
+	limitationsteady [label="Limitation: Real flows are often unsteady (transient or fluctuating)"]
+	end [label="End: Key Assumptions Defined"]
+	start -> assumptionviscosity [label="Focus on Key Assumptions"]
+	assumptionviscosity -> limitationviscosity [label="Leads to Inherent Limitation"]
+	limitationviscosity -> assumptionsteady [label="Next Assumption"]
+	assumptionsteady -> limitationsteady [label="Leads to Inherent Limitation"]
+	limitationsteady -> end [label="All major points covered"]
+}

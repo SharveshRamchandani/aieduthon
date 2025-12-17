@@ -1,0 +1,19 @@
+// 4. Classification of Fluids: Newtonian Fluids: Water, air, ethanol; constant viscosity under similar conditions. Non-Newtonian Fluids: Cornstarch pastes (oobleck), latex paints, blood—viscosity changes with shear rate and flow conditions.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	A [label="Classification of Fluids"]
+	B [label="Newtonian Fluids"]
+	C [label="Non-Newtonian Fluids"]
+	B1 [label="Water, Air, Ethanol"]
+	B2 [label="Viscosity is constant under similar conditions"]
+	C1 [label="Cornstarch Pastes (Oobleck), Latex Paints, Blood"]
+	C2 [label="Viscosity changes with shear rate and flow conditions"]
+	A -> B [label="Category 1"]
+	A -> C [label="Category 2"]
+	B -> B1 [label=Examples]
+	B -> B2 [label=Characteristic]
+	C -> C1 [label=Examples]
+	C -> C2 [label=Characteristic]
+}

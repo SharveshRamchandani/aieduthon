@@ -353,3 +353,4 @@ class SpeakerNotesAgent:
 		}
 		
 		analytics_collection.insert_one(event_doc)
+ 

@@ -1,0 +1,28 @@
+// Understanding Bernoulli's Theorem: Linking Speed, Pressure, and Elevation in Fluid Flow: This foundational theorem mathematically connects the fluid's speed, the static pressure it exerts, and its vertical height relative to a reference point within a flowing system. The theorem is strictly applicable only when analyzing the behavior of ideal fluids, which are characterized as being perfectly incompressible and possessing zero internal friction or viscosity.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	A [label="Bernoulli's Theorem: Understanding Fluid Flow Dynamics"]
+	B [label="Core Concept: Mathematical Connection in Fluid Flow"]
+	C1 [label="Fluid Property 1: Speed (Velocity)"]
+	C2 [label="Fluid Property 2: Static Pressure"]
+	C3 [label="Fluid Property 3: Vertical Height (Elevation)"]
+	D [label="Relationship Defined By: Bernoulli's Equation"]
+	E [label="Constraint Check: Applicability Condition"]
+	F1 [label="Ideal Fluid Characteristic 1: Incompressible (Constant Density)"]
+	F2 [label="Ideal Fluid Characteristic 2: Zero Viscosity (No Internal Friction)"]
+	G [label="Conclusion: Theorem is Valid Only for Ideal Fluids"]
+	A -> B [label="Focuses on"]
+	B -> C1 [label=Links]
+	B -> C2 [label=Links]
+	B -> C3 [label=Links]
+	C1 -> D [label="Used in"]
+	C2 -> D [label="Used in"]
+	C3 -> D [label="Used in"]
+	D -> E [label=Requires]
+	E -> G [label="If YES (Ideal Fluid)"]
+	E -> F1 [label="If NO (Check Conditions)"]
+	F1 -> F2 [label="Must also satisfy"]
+	F2 -> G [label="If both satisfied"]
+}

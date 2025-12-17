@@ -187,14 +187,140 @@ def _crop_center_to_aspect(img: Image.Image, target_w: int, target_h: int) -> Im
     return img.crop(box)
 
 
-def _add_image(slide, img_path: str, box: Dict[str, float], mode: str = "fill"):
+def _calculate_available_space(slide, content_area: Optional[Dict[str, float]] = None) -> Dict[str, float]:
+    """
+    Calculate available space on a slide for image placement.
+    
+    Args:
+        slide: PowerPoint slide object
+        content_area: Optional dict with 'left', 'top', 'width', 'height' of content area
+        
+    Returns:
+        Dict with available space information
+    """
+    # Standard slide dimensions (10x7.5 inches for 16:9)
+    SLIDE_WIDTH = 10.0
+    SLIDE_HEIGHT = 7.5
+    MARGIN = 0.5
+    
+    # Default content area if not provided
+    if content_area is None:
+        # Estimate content area: left side for text, right side for image
+        content_area = {
+            "left": MARGIN,
+            "top": 1.5,  # Below title
+            "width": 5.5,  # Left side for content
+            "height": 5.5
+        }
+    
+    # Calculate available space for image (right side)
+    available_left = content_area["left"] + content_area["width"] + 0.2
+    available_top = content_area["top"]
+    available_width = SLIDE_WIDTH - available_left - MARGIN
+    available_height = SLIDE_HEIGHT - available_top - MARGIN
+    
+    return {
+        "left": available_left,
+        "top": available_top,
+        "width": max(2.0, available_width),  # Minimum 2 inches
+        "height": max(2.0, available_height),  # Minimum 2 inches
+        "slide_width": SLIDE_WIDTH,
+        "slide_height": SLIDE_HEIGHT
+    }
+
+
+def _calculate_optimal_image_size(
+    image_path: str,
+    available_space: Dict[str, float],
+    max_size_ratio: float = 0.9,
+    min_size_ratio: float = 0.3
+) -> Dict[str, float]:
+    """
+    Calculate optimal image size based on available space and image dimensions.
+    
+    Args:
+        image_path: Path to image file
+        available_space: Dict with available space dimensions
+        max_size_ratio: Maximum ratio of available space to use (0.0-1.0)
+        min_size_ratio: Minimum ratio of available space to use (0.0-1.0)
+        
+    Returns:
+        Dict with optimal width, height, left, top positions
+    """
+    try:
+        image = Image.open(image_path)
+        img_width_px, img_height_px = image.size
+        img_ratio = img_width_px / img_height_px if img_height_px > 0 else 1.0
+    except Exception:
+        # Fallback if image can't be opened
+        img_ratio = 1.0
+    
+    avail_w = available_space["width"]
+    avail_h = available_space["height"]
+    avail_ratio = avail_w / avail_h if avail_h > 0 else 1.0
+    
+    # Calculate optimal size maintaining aspect ratio
+    if img_ratio > avail_ratio:
+        # Image is wider than available space
+        optimal_width = avail_w * max_size_ratio
+        optimal_height = optimal_width / img_ratio
+        # Ensure minimum size
+        if optimal_height < avail_h * min_size_ratio:
+            optimal_height = avail_h * min_size_ratio
+            optimal_width = optimal_height * img_ratio
+    else:
+        # Image is taller than available space
+        optimal_height = avail_h * max_size_ratio
+        optimal_width = optimal_height * img_ratio
+        # Ensure minimum size
+        if optimal_width < avail_w * min_size_ratio:
+            optimal_width = avail_w * min_size_ratio
+            optimal_height = optimal_width / img_ratio
+    
+    # Center the image in available space
+    left = available_space["left"] + (avail_w - optimal_width) / 2
+    top = available_space["top"] + (avail_h - optimal_height) / 2
+    
+    return {
+        "left": max(available_space["left"], left),
+        "top": max(available_space["top"], top),
+        "width": min(optimal_width, avail_w),
+        "height": min(optimal_height, avail_h)
+    }
+
+
+def _add_image(slide, img_path: str, box: Optional[Dict[str, float]] = None, mode: str = "dynamic", content_area: Optional[Dict[str, float]] = None):
+    """
+    Add an image to a slide with dynamic resizing support.
+    
+    Args:
+        slide: PowerPoint slide object
+        img_path: Path to image file
+        box: Optional dict with fixed box dimensions (for backward compatibility)
+        mode: Resizing mode - "fill", "fit", or "dynamic" (default)
+        content_area: Optional dict with content area dimensions for dynamic sizing
+    """
     image = Image.open(img_path)
-    box_left, box_top, box_w, box_h = (
-        box.get("left", DEFAULT_IMAGE_BOX["left"]),
-        box.get("top", DEFAULT_IMAGE_BOX["top"]),
-        box.get("w", DEFAULT_IMAGE_BOX["w"]),
-        box.get("h", DEFAULT_IMAGE_BOX["h"]),
-    )
+    
+    # Dynamic mode: calculate optimal size based on available space
+    if mode == "dynamic":
+        available_space = _calculate_available_space(slide, content_area)
+        optimal_size = _calculate_optimal_image_size(img_path, available_space)
+        box_left = optimal_size["left"]
+        box_top = optimal_size["top"]
+        box_w = optimal_size["width"]
+        box_h = optimal_size["height"]
+    else:
+        # Use provided box or default
+        if box is None:
+            box = DEFAULT_IMAGE_BOX
+        box_left, box_top, box_w, box_h = (
+            box.get("left", DEFAULT_IMAGE_BOX["left"]),
+            box.get("top", DEFAULT_IMAGE_BOX["top"]),
+            box.get("w", DEFAULT_IMAGE_BOX["w"]),
+            box.get("h", DEFAULT_IMAGE_BOX["h"]),
+        )
+    
     if mode == "fill":
         cropped = _crop_center_to_aspect(
             image,
@@ -211,10 +337,10 @@ def _add_image(slide, img_path: str, box: Dict[str, float], mode: str = "fill"):
             height=Inches(box_h),
         )
         tmp_path.unlink(missing_ok=True)
-    else:
+    else:  # "fit" or "dynamic"
         iw, ih = image.size
-        img_ratio = iw / ih
-        box_ratio = box_w / box_h
+        img_ratio = iw / ih if ih > 0 else 1.0
+        box_ratio = box_w / box_h if box_h > 0 else 1.0
         if img_ratio > box_ratio:
             used_w = box_w
             used_h = used_w / img_ratio
@@ -398,10 +524,17 @@ def build_clean_ppt_from_raw(
             slide.notes_slide.notes_text_frame.text = clean_text(notes)
         image_prompt = slide_data.get("image_prompt") or _build_slide_prompt(slide_data)
         box = slide_data.get("image_box_inches") or DEFAULT_IMAGE_BOX
-        mode = slide_data.get("image_mode", meta.get("default_image_mode", "fill"))
+        mode = slide_data.get("image_mode", meta.get("default_image_mode", "dynamic"))
         img_path = _ensure_image(image_prompt, idx, box, seed_base)
         if img_path:
-            _add_image(slide, img_path, box, mode=mode)
+            # Estimate content area for dynamic sizing
+            content_area = {
+                "left": 0.5,
+                "top": 1.5,
+                "width": 5.5,
+                "height": 5.5
+            }
+            _add_image(slide, img_path, box, mode=mode, content_area=content_area)
     buffer = io.BytesIO()
     prs.save(buffer)
     buffer.seek(0)

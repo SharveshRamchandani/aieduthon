@@ -415,7 +415,7 @@ class TextGenerationAgent:
             config_obj = get_config()
             provider = text_config.get("provider", config_obj.llm_provider)
             if provider == "gemini":
-                model_name = config_obj.gemini_model_id or text_config.get("name") or "gemini-2.5-flash"
+                model_name = config_obj.gemini_model_id or text_config.get("name") or "gemini-flash-lite-latest"
             elif provider == "ollama":
                 model_name = text_config.get("ollama_model") or text_config.get("name") or "deepseek-r1:1.5b"
             else:
@@ -548,7 +548,7 @@ class TextGenerationAgent:
         config_obj = get_config()
         gemini_api_key = config_obj.gemini_api_key
         # Get model from config or use default
-        model_id = config_obj.gemini_model_id or (config.get("name") if config else "gemma-3-1b-it")
+        model_id = config_obj.gemini_model_id or (config.get("name") if config else "gemini-flash-lite-latest")
         
         # Get API version from config (v1 or v1beta)
         api_version = config.get("api_version", "v1") if config else "v1"
@@ -1309,27 +1309,36 @@ Existing slide JSON:
                 if json_match:
                     content = json.loads(json_match.group())
                     
-                    # Preserve image placeholders from original
+                    # Preserve image placeholders from original (only if both slides are dicts)
                     if original_content:
-                        original_slides = original_content.get("slides", [])
-                        expanded_slides = content.get("slides", [])
-                        for idx, (original_slide, expanded_slide) in enumerate(zip(original_slides, expanded_slides)):
-                            if original_slide.get("images"):
-                                expanded_slide["images"] = original_slide["images"]
+                        original_slides = original_content.get("slides", []) if isinstance(original_content, dict) else []
+                        expanded_slides = content.get("slides", []) if isinstance(content, dict) else []
+                        if isinstance(original_slides, list) and isinstance(expanded_slides, list):
+                            for idx, (original_slide, expanded_slide) in enumerate(zip(original_slides, expanded_slides)):
+                                if not isinstance(original_slide, dict) or not isinstance(expanded_slide, dict):
+                                    continue
+                                if original_slide.get("images"):
+                                    expanded_slide["images"] = original_slide["images"]
                     
                     result["content"] = content
                     result["text"] = json.dumps(content, indent=2)
                     
                     # Preserve image markers
                     aggregated_markers = list(result.get("image_markers", []))
-                    for slide in content.get("slides", []):
-                        for image in slide.get("images", []):
-                            aggregated_markers.append({
-                                "marker": image.get("marker") or image.get("id"),
-                                "description": image.get("caption") or image.get("alt_text") or image.get("marker") or image.get("id"),
-                                "placement": image.get("placement", "auto"),
-                                "slide_title": slide.get("title")
-                            })
+                    slides_list = content.get("slides", []) if isinstance(content, dict) else []
+                    if isinstance(slides_list, list):
+                        for slide in slides_list:
+                            if not isinstance(slide, dict):
+                                continue
+                            for image in slide.get("images", []) or []:
+                                if not isinstance(image, dict):
+                                    continue
+                                aggregated_markers.append({
+                                    "marker": image.get("marker") or image.get("id"),
+                                    "description": image.get("caption") or image.get("alt_text") or image.get("marker") or image.get("id"),
+                                    "placement": image.get("placement", "auto"),
+                                    "slide_title": slide.get("title")
+                                })
                     result["image_markers"] = aggregated_markers
             except Exception as e:
                 logger.warning(f"Failed to parse Gemini expanded slide JSON: {e}")

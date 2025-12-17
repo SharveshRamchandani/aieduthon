@@ -10,28 +10,31 @@ import (
 	"go.uber.org/zap"
 )
 
-func RunMigrations(){
+func RunMigrations() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	modals := map[string]interface{}{
-		"users" : mongodb.Users{},
-		"analytics" : mongodb.Analytics{},
-		"diagrams" : mongodb.Diagram{},
-		"jobs" : mongodb.Job{},
-		"media" : mongodb.Media{},
-		"prompts" : mongodb.Prompt{},
-		"quizzes" : mongodb.Quiz{},
-		"slides" : mongodb.Slide{},
-		"templates" : mongodb.Template{},
-		"translations" : mongodb.Translation{},
+		"users":        mongodb.Users{},
+		"analytics":    mongodb.Analytics{},
+		"diagrams":     mongodb.Diagram{},
+		"jobs":         mongodb.Job{},
+		"media":        mongodb.Media{},
+		"prompts":      mongodb.Prompt{},
+		"quizzes":      mongodb.Quiz{},
+		"slides":       mongodb.Slide{},
+		"templates":    mongodb.Template{},
+		"translations": mongodb.Translation{},
+		"ai_cache":     mongodb.AICache{},
+		"ai_sessions":  mongodb.AISession{},
+		"ai_outputs":   mongodb.AIOutput{},
+		"ai_feedback":  mongodb.AIFeedback{},
 	}
 
+	for collectionName, modal := range modals {
 
-	for collectionName, modal := range modals{
-		
 		err := db.MongoDataBase.CreateCollection(ctx, collectionName)
-		if err != nil && !alreadyexists(err){
+		if err != nil && !alreadyexists(err) {
 			logger.Log.Error("failed to create collection", zap.String("collectionName: ", collectionName), zap.Error(err))
 			return
 		}
@@ -44,4 +47,3 @@ func RunMigrations(){
 
 	logger.Log.Info("Migrations are complete, DB is ready")
 }
-

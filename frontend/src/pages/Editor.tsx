@@ -253,10 +253,11 @@ const Editor = () => {
     if (!id) return;
 
     try {
-      const result = await generateQuiz(id, 'demo-user');
+      // Request quiz generation and auto-download PDF
+      await generateQuiz(id, 'demo-user', undefined, undefined, 'pdf');
       toast({
         title: 'Success',
-        description: `Quiz generated! Quiz IDs: ${result.quiz_ids.join(', ')}`,
+        description: 'Quiz generated and downloading as PDF.',
       });
     } catch (err) {
       toast({
@@ -517,6 +518,13 @@ const Editor = () => {
           ))}
         </div>
       </div>
+      
+      <ExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        onExport={exportPresentation}
+        isExporting={isExporting}
+      />
     </div>
   );
 };

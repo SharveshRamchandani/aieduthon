@@ -1,0 +1,10 @@
+// Temperature Dependence: As temperature increases, the reaction rate generally increases, leading to faster product formation. Conversely, cooling a reaction mixture significantly slows down the reaction rate, reducing product yield.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	start [label=Start]
+	step1 [label="Step 1"]
+	start -> step1 [label="Increases Reaction Rate"]
+	step1 -> end [label="Product Formation Increases"]
+}

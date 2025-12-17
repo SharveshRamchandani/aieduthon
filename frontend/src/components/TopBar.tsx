@@ -89,8 +89,8 @@ const TopBar = () => {
 
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 flex justify-center py-6 px-4 z-20 bg-background">
-        <div className="flex items-center justify-between px-6 py-3  rounded-full shadow-lg w-full max-w-2xl ">
+      <div className="fixed top-0 left-0 right-0 flex justify-center py-6 px-4 z-50 bg-background">
+        <div className="flex items-center justify-between px-6 py-3 bg-background rounded-full shadow-lg w-full max-w-5xl border border-border">
           {/* Brand */}
           <div className="flex items-center gap-2">
             <motion.div
@@ -291,5 +291,6 @@ const TopBar = () => {
 };
 
 export { TopBar };
+
 
 

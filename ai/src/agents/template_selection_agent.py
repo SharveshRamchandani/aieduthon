@@ -1,9 +1,13 @@
 import logging
 import random
 import re
+import base64
+import io
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import List, Optional, Set, Dict, Any
+
+from ai_db import get_ai_db
 
 logger = logging.getLogger(__name__)
 
@@ -127,33 +131,67 @@ class TemplateProfile:
 class TemplateSelectionAgent:
 	"""Chooses an appropriate PPT template based on subject, audience, and style."""
 
-	def __init__(self, template_dir: Optional[Path] = None):
-		self.template_dir = Path(template_dir or TEMPLATE_DIR)
+	def __init__(self, template_dir: Optional[Path] = None, use_db: bool = True):
+		self.db = get_ai_db() if use_db else None
+		self.templates_collection = self.db["templates"] if self.db is not None else None
+		self.use_db = use_db
+		self.template_dir = Path(template_dir or TEMPLATE_DIR) if not use_db else None
 		self.templates = self._scan_templates()
 		self.template_profiles = self._build_template_profiles()
 
-	def _scan_templates(self) -> List[Path]:
-		if not self.template_dir.exists():
-			logger.warning(f"Template directory not found: {self.template_dir}")
-			return []
-		return sorted(self.template_dir.glob("*.pptx"))
+	def _scan_templates(self) -> List[Any]:
+		"""Scan templates from MongoDB or file system"""
+		if self.use_db and self.templates_collection is not None:
+			# Load from MongoDB
+			templates = list(self.templates_collection.find({}, {"templateId": 1, "filename": 1}))
+			logger.info(f"Loaded {len(templates)} templates from MongoDB")
+			return templates
+		else:
+			# Fallback to file system
+			if not self.template_dir or not self.template_dir.exists():
+				logger.warning(f"Template directory not found: {self.template_dir}")
+				return []
+			return sorted(self.template_dir.glob("*.pptx"))
 
 	def _build_template_profiles(self) -> List["TemplateProfile"]:
 		profiles: List[TemplateProfile] = []
-		for template_path in self.templates:
-			filename = template_path.name.lower()
-			metadata = TEMPLATE_LIBRARY.get(filename, {})
-			keywords = metadata.get("keywords") or self._keywords_from_filename(template_path.stem)
-
-			profiles.append(
-				TemplateProfile(
-					path=str(template_path),
-					subjects=set(metadata.get("subjects", {"general"})),
-					styles=set(metadata.get("styles", {"general"})),
-					audiences=set(metadata.get("audiences", {"school", "college", "professional"})),
-					keywords=set(keywords),
+		
+		if self.use_db and self.templates_collection is not None:
+			# Load from MongoDB
+			templates = self.templates_collection.find({})
+			for template_doc in templates:
+				filename_lower = template_doc.get("filename_lower", "").lower()
+				metadata = TEMPLATE_LIBRARY.get(filename_lower, {})
+				keywords = metadata.get("keywords") or self._keywords_from_filename(template_doc.get("filename", ""))
+				
+				# Use templateId as path identifier for DB templates
+				template_id = template_doc.get("templateId") or template_doc.get("_id")
+				
+				profiles.append(
+					TemplateProfile(
+						path=f"db:{template_id}",  # Prefix with "db:" to indicate DB source
+						subjects=set(template_doc.get("subjects", metadata.get("subjects", {"general"}))),
+						styles=set(template_doc.get("styles", metadata.get("styles", {"general"}))),
+						audiences=set(template_doc.get("audiences", metadata.get("audiences", {"school", "college", "professional"}))),
+						keywords=set(keywords),
+					)
 				)
-			)
+		else:
+			# Fallback to file system
+			for template_path in self.templates:
+				filename = template_path.name.lower()
+				metadata = TEMPLATE_LIBRARY.get(filename, {})
+				keywords = metadata.get("keywords") or self._keywords_from_filename(template_path.stem)
+
+				profiles.append(
+					TemplateProfile(
+						path=str(template_path),
+						subjects=set(metadata.get("subjects", {"general"})),
+						styles=set(metadata.get("styles", {"general"})),
+						audiences=set(metadata.get("audiences", {"school", "college", "professional"})),
+						keywords=set(keywords),
+					)
+				)
 
 		return profiles
 
@@ -186,7 +224,11 @@ class TemplateSelectionAgent:
 
 		if best_score <= 0:
 			# Fall back to a random template for variety
-			return str(random.choice(self.templates))
+			if self.use_db and self.templates_collection is not None:
+				random_template = self.templates_collection.aggregate([{"$sample": {"size": 1}}]).next()
+				return f"db:{random_template.get('templateId')}"
+			else:
+				return str(random.choice(self.templates))
 
 		return random.choice(candidates).path
 

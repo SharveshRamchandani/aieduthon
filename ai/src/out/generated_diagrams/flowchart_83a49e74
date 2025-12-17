@@ -1,0 +1,19 @@
+// The Bernoulli Effect: Unveiling the Inverse Relationship Between Fluid Speed and Pressure: A direct and critical consequence of energy conservation mandates an inverse relationship between the fluid's kinetic energy (speed) and its static pressure component. Consequently, in regions where the fluid streamlines are constricted, causing the flow speed ($v$) to accelerate, the corresponding static pressure ($P$) must necessarily decrease to maintain the constant energy sum.
+digraph {
+	rankdir=TB
+	node [fillcolor=lightblue shape=box style="rounded,filled"]
+	edge [color=gray]
+	A [label="Energy Conservation Mandate (Total Energy = Constant)"]
+	B [label="Total Energy = Static Pressure (P) + Dynamic Pressure (Kinetic Energy / Speed Squared, related to $v^2$)"]
+	C [label="Fluid Streamlines are Constricted"]
+	D [label="Flow Speed ($v$) Accelerates (Increased Kinetic Energy)"]
+	E [label="Inverse Relationship: As Kinetic Energy Increases..."]
+	F [label="Static Pressure ($P$) Must Decrease"]
+	G [label="Bernoulli Effect Demonstrated: High Speed $\rightarrow$ Low Pressure"]
+	A -> B [label="Governs the Energy Balance"]
+	B -> C [label="Leads to the analysis of flow regions"]
+	C -> D [label="Effect of Constriction"]
+	D -> E [label="Leads to the consequence"]
+	E -> F [label="To maintain constant Total Energy (from B)"]
+	F -> G [label="Resulting Phenomenon"]
+}

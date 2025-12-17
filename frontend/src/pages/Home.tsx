@@ -29,6 +29,7 @@ const Home = () => {
   const [showSearch, setShowSearch] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [estimatedSlides, setEstimatedSlides] = useState('');
+  const [quizCount, setQuizCount] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -95,6 +96,12 @@ const Home = () => {
           context.estimated_slides = parsed;
         }
       }
+      if (quizCount) {
+        const parsedQuiz = parseInt(quizCount, 10);
+        if (!Number.isNaN(parsedQuiz)) {
+          context.quiz_questions = parsedQuiz;
+        }
+      }
       if (generateImages || generateDiagrams) context.generate_media = true;
 
       const data = await orchestrate({
@@ -105,6 +112,7 @@ const Home = () => {
         generate_images: generateImages,
         generate_diagrams: generateDiagrams,
         estimated_slides: context.estimated_slides,
+        quiz_questions: context.quiz_questions,
       });
 
       setIsGenerating(false);
@@ -285,6 +293,21 @@ const Home = () => {
                   />
                   <p className="text-xs text-muted-foreground">
                     Request between 3–30 slides (defaults to AI estimate if empty)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>MCQs to Generate</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={50}
+                    placeholder="e.g., 8"
+                    value={quizCount}
+                    onChange={(e) => setQuizCount(e.target.value)}
+                    disabled={isGenerating}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Choose how many quiz MCQs to create (1–50). Defaults to 10 if empty.
                   </p>
                 </div>
               </div>

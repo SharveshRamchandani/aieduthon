@@ -61,6 +61,8 @@ export interface OrchestrateRequest {
   presentation_style?: string;
   generate_images?: boolean;
   generate_diagrams?: boolean;
+  generate_tts?: boolean;
+  tts_slow?: boolean;
   estimated_slides?: number;
 }
 
@@ -69,6 +71,20 @@ export interface OrchestrateResponse {
   promptId?: string;
   quizIds?: string[];
   mediaGenerated?: boolean;
+  ttsGenerated?: boolean;
+  ttsFiles?: Array<{
+    file_url: string;
+    slide_index: number;
+    duration_estimate: number;
+    filename?: string;
+  }>;
+  ttsCombined?: {
+    file_url: string;
+    duration_estimate: number;
+  };
+  pptFile?: string;
+  pptFilename?: string;
+  pptValidation?: any;
   message?: string;
 }
 
@@ -151,6 +167,8 @@ export async function orchestrate(request: OrchestrateRequest): Promise<Orchestr
       presentation_style: request.presentation_style || 'educational',
       generate_images: request.generate_images ?? true,
       generate_diagrams: request.generate_diagrams ?? true,
+      generate_tts: request.generate_tts ?? false,
+      tts_slow: request.tts_slow ?? false,
     }),
   });
 
@@ -354,5 +372,117 @@ export async function generateQuiz(
   }
 
   return response.json();
+}
+
+// TTS (Text-to-Speech) Functions
+
+export interface GenerateTTSRequest {
+  userId: string;
+  locale?: string;
+  slow?: boolean;
+}
+
+export interface GenerateTTSResponse {
+  success: boolean;
+  audio_files: Array<{
+    file_path: string;
+    file_url: string;
+    filename: string;
+    slide_index: number;
+    duration_estimate: number;
+    word_count?: number;
+  }>;
+  combined_audio?: {
+    file_path: string;
+    file_url: string;
+    duration_estimate: number;
+  };
+  metadata?: {
+    generated_at: string;
+    deck_id: string;
+    total_slides: number;
+    locale: string;
+  };
+  error?: string;
+}
+
+export interface GenerateTTSTextRequest {
+  text: string;
+  locale?: string;
+  slow?: boolean;
+  output_filename?: string;
+}
+
+// Generate TTS for a deck
+export async function generateTTSForDeck(
+  deckId: string,
+  request: GenerateTTSRequest
+): Promise<GenerateTTSResponse> {
+  const response = await fetch(`${API_BASE_URL}/slides/${deckId}/tts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userId: request.userId,
+      locale: request.locale || 'en',
+      slow: request.slow || false,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || 'Failed to generate TTS');
+  }
+
+  return response.json();
+}
+
+// Get TTS metadata for a deck
+export async function getTTSForDeck(deckId: string): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/slides/${deckId}/tts`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || 'Failed to fetch TTS data');
+  }
+
+  return response.json();
+}
+
+// Generate TTS from arbitrary text
+export async function generateTTSFromText(
+  request: GenerateTTSTextRequest
+): Promise<{
+  success: boolean;
+  file_path: string;
+  file_url: string;
+  filename: string;
+  duration_estimate: number;
+  word_count: number;
+}> {
+  const response = await fetch(`${API_BASE_URL}/generate-tts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text: request.text,
+      locale: request.locale || 'en',
+      slow: request.slow || false,
+      output_filename: request.output_filename,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || 'Failed to generate TTS from text');
+  }
+
+  return response.json();
+}
+
+// Get TTS audio file URL
+export function getTTSAudioURL(filename: string): string {
+  return `${API_BASE_URL}/tts/${filename}`;
 }
 

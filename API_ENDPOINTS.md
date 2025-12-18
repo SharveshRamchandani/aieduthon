@@ -36,6 +36,8 @@
   "presentation_style": "educational",
   "generate_images": true,
   "generate_diagrams": true,
+  "generate_tts": false,
+  "tts_slow": false,
   "estimated_slides": 10
 }
 ```
@@ -47,6 +49,18 @@
   "promptId": "...",
   "quizIds": ["..."],
   "mediaGenerated": true,
+  "ttsGenerated": true,
+  "ttsFiles": [
+    {
+      "file_url": "/tts/deck_..._slide_0.mp3",
+      "slide_index": 0,
+      "duration_estimate": 45.2
+    }
+  ],
+  "ttsCombined": {
+    "file_url": "/tts/deck_..._combined.mp3",
+    "duration_estimate": 320.5
+  },
   "pptFile": "base64...",
   "pptFilename": "presentation.pptx",
   "pptValidation": {...}
@@ -377,6 +391,10 @@
 | 12 | POST | `/generate-slides` | Generate slides with media | JSON |
 | 13 | POST | `/generate-media/{deck_id}` | Add media to deck | JSON |
 | 14 | POST | `/generate-notes` | Generate standalone notes | PDF download |
+| 15 | POST | `/slides/{deck_id}/tts` | Generate TTS audio for deck | JSON |
+| 16 | GET | `/slides/{deck_id}/tts` | Get TTS metadata | JSON |
+| 17 | GET | `/tts/{filename}` | Download TTS audio file | MP3 download |
+| 18 | POST | `/generate-tts` | Generate TTS from text | JSON |
 
 ---
 
@@ -401,11 +419,114 @@
 
 ---
 
+## 🔊 Text-to-Speech (TTS) Endpoints
+
+### 15. **POST /slides/{deck_id}/tts**
+**Description:** Generate TTS audio for a slide deck.
+
+**URL Parameters:**
+- `deck_id` (path) - MongoDB ObjectId of the deck
+
+**Request Body (JSON):**
+```json
+{
+  "userId": "user123",
+  "locale": "en",
+  "slow": false
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "audio_files": [
+    {
+      "file_path": "out/tts_audio/deck_..._slide_0.mp3",
+      "file_url": "/tts/deck_..._slide_0.mp3",
+      "filename": "deck_..._slide_0.mp3",
+      "slide_index": 0,
+      "duration_estimate": 45.2,
+      "word_count": 113
+    }
+  ],
+  "combined_audio": {
+    "file_path": "out/tts_audio/deck_..._combined.mp3",
+    "file_url": "/tts/deck_..._combined.mp3",
+    "duration_estimate": 320.5
+  },
+  "metadata": {
+    "generated_at": "...",
+    "deck_id": "...",
+    "total_slides": 10,
+    "locale": "en"
+  }
+}
+```
+
+**Example:** `POST /slides/6937a4c2c5299b45ebf91e79/tts`
+
+---
+
+### 16. **GET /slides/{deck_id}/tts**
+**Description:** Get TTS audio metadata for a deck.
+
+**URL Parameters:**
+- `deck_id` (path) - MongoDB ObjectId of the deck
+
+**Example:** `GET /slides/6937a4c2c5299b45ebf91e79/tts`
+
+**Response:** TTS metadata with all audio files and URLs
+
+---
+
+### 17. **GET /tts/{filename}**
+**Description:** Download a TTS audio file.
+
+**URL Parameters:**
+- `filename` (path) - Name of the audio file (e.g., `deck_..._slide_0.mp3`)
+
+**Example:** `GET /tts/deck_6937a4c2c5299b45ebf91e79_slide_0.mp3`
+
+**Response:** Binary MP3 file download
+
+---
+
+### 18. **POST /generate-tts**
+**Description:** Generate TTS audio from arbitrary text.
+
+**Request Body (JSON):**
+```json
+{
+  "text": "Hello, this is a test of text-to-speech.",
+  "locale": "en",
+  "slow": false,
+  "output_filename": "custom_audio.mp3"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "file_path": "out/tts_audio/custom_audio.mp3",
+  "file_url": "/tts/custom_audio.mp3",
+  "filename": "custom_audio.mp3",
+  "duration_estimate": 3.5,
+  "word_count": 8
+}
+```
+
+---
+
 ## ⚠️ Important Notes
 
 - All `deck_id` values are MongoDB ObjectIds (24 hex characters)
 - PDF export requires LibreOffice for best quality (falls back to ReportLab)
 - Quiz generation requires `reportlab` library for PDF export
 - Media generation is optional and won't fail the orchestration if it errors
+- **TTS generation** requires `gtts` library: `pip install gtts`
+- TTS supports multiple locales (en, hi, ta, etc.) - uses Google TTS
 - The `/orchestrate` endpoint does everything in one call (recommended for most use cases)
+- TTS can be enabled in `/orchestrate` by setting `generate_tts: true`
 

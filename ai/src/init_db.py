@@ -78,6 +78,14 @@ def create_collections_and_indexes():
     jobs.create_index([("timestamp", -1)])
     print("[OK] Created jobs collection with indexes")
     
+    # 10. TTS Audio collection
+    tts_audio = db["tts_audio"]
+    tts_audio.create_index([("deck_id", 1)])
+    tts_audio.create_index([("user_id", 1)])
+    tts_audio.create_index([("locale", 1)])
+    tts_audio.create_index([("generated_at", -1)])
+    print("[OK] Created tts_audio collection with indexes")
+    
     print("\nAll collections created successfully!")
 
 
@@ -169,7 +177,7 @@ def verify_setup():
     expected_collections = [
         "prompts", "slides", "media", "quizzes", 
         "diagrams", "translations", "analytics", 
-        "templates", "jobs"
+        "templates", "jobs", "tts_audio"
     ]
     
     existing_collections = db.list_collection_names()

@@ -1,5 +1,59 @@
 "use client";
 
+// TypeScript declarations for Speech Recognition API
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+declare var SpeechRecognition: {
+  prototype: SpeechRecognition;
+  new (): SpeechRecognition;
+};
+
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TopBar } from '@/components/TopBar';
@@ -9,8 +63,8 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkles, Image, Network, Loader2, Search, Palette, Settings, Globe, Paperclip, Send } from 'lucide-react';
-import { orchestrate } from '@/lib/api';
+import { Sparkles, Image, Network, Loader2, Search, Palette, Settings, Globe, Paperclip, Send, Mic, MicOff } from 'lucide-react';
+import { orchestrate, generateTTSFromText, getTTSAudioURL } from '@/lib/api';
 import { Textarea } from '@/components/ui/textarea';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -30,8 +84,98 @@ const Home = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [estimatedSlides, setEstimatedSlides] = useState('');
   const [quizCount, setQuizCount] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
+  const [isPlayingTTS, setIsPlayingTTS] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = locale === 'en' ? 'en-US' : locale === 'hi' ? 'hi-IN' : 'ta-IN';
+
+        recognition.onstart = () => {
+          setIsListening(true);
+        };
+
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          let interimTranscript = '';
+          let finalTranscript = '';
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + ' ';
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          if (finalTranscript) {
+            const newText = finalTranscript.trim();
+            setPrompt(prev => prev + (prev ? ' ' : '') + newText);
+          } else if (interimTranscript) {
+            // Optionally show interim results
+            // setPrompt(prev => prev + interimTranscript);
+          }
+        };
+
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+          console.error('Speech recognition error:', event.error);
+          setIsListening(false);
+          if (event.error === 'not-allowed') {
+            toast({
+              title: 'Microphone Permission Denied',
+              description: 'Please allow microphone access to use voice input',
+              variant: 'destructive',
+            });
+          } else if (event.error === 'no-speech') {
+            toast({
+              title: 'No Speech Detected',
+              description: 'Please try speaking again',
+              variant: 'destructive',
+            });
+          }
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+          // Auto-generate TTS when voice input ends if there's text
+          if (prompt.trim()) {
+            handleGenerateTTSForPrompt();
+          }
+        };
+
+        recognitionRef.current = recognition;
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [locale, toast]);
+
+  // Update recognition language when locale changes
+  useEffect(() => {
+    if (recognitionRef.current) {
+      const langMap: Record<string, string> = {
+        'en': 'en-US',
+        'hi': 'hi-IN',
+        'ta': 'ta-IN'
+      };
+      recognitionRef.current.lang = langMap[locale] || 'en-US';
+    }
+  }, [locale]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -74,6 +218,132 @@ const Home = () => {
       console.log('File selected:', file.name);
     }
   };
+
+  const toggleVoiceInput = () => {
+    // If TTS is playing, stop it
+    if (isPlayingTTS) {
+      stopTTSAudio();
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      toast({
+        title: 'Voice Input Not Available',
+        description: 'Your browser does not support speech recognition. Please use Chrome, Edge, or Safari.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      // Generate TTS when stopping if there's text
+      if (prompt.trim()) {
+        handleGenerateTTSForPrompt();
+      }
+    } else {
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to start voice input. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+  const handleGenerateTTSForPrompt = async () => {
+    if (!prompt.trim()) {
+      return;
+    }
+
+    setIsGeneratingTTS(true);
+    try {
+      const result = await generateTTSFromText({
+        text: prompt,
+        locale: locale,
+        slow: false,
+      });
+
+      if (result.success && result.file_url) {
+        // Play the audio
+        const audioUrl = getTTSAudioURL(result.filename);
+        playTTSAudio(audioUrl);
+        
+        toast({
+          title: 'TTS Generated',
+          description: 'Playing your prompt audio...',
+        });
+      }
+    } catch (error) {
+      console.error('Error generating TTS:', error);
+      toast({
+        title: 'TTS Generation Failed',
+        description: error instanceof Error ? error.message : 'Could not generate audio',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingTTS(false);
+    }
+  };
+
+  const playTTSAudio = (audioUrl: string) => {
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+
+    audio.onplay = () => {
+      setIsPlayingTTS(true);
+    };
+
+    audio.onended = () => {
+      setIsPlayingTTS(false);
+      audioRef.current = null;
+    };
+
+    audio.onerror = () => {
+      setIsPlayingTTS(false);
+      toast({
+        title: 'Audio Playback Failed',
+        description: 'Could not play the audio file',
+        variant: 'destructive',
+      });
+      audioRef.current = null;
+    };
+
+    audio.play().catch((error) => {
+      console.error('Error playing audio:', error);
+      setIsPlayingTTS(false);
+      audioRef.current = null;
+    });
+  };
+
+  const stopTTSAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setIsPlayingTTS(false);
+    }
+  };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   const generateSlides = async () => {
     if (!prompt.trim()) {
@@ -356,6 +626,47 @@ const Home = () => {
 
                       <div className="h-14 bg-black/5 dark:bg-white/5 rounded-b-xl flex items-center justify-between px-3">
                         <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={toggleVoiceInput}
+                            disabled={isGenerating || isGeneratingTTS}
+                            className={cn(
+                              "rounded-lg px-3 py-1.5 h-auto text-sm flex items-center gap-1.5 bg-black/5 dark:bg-white/5 hover:bg-accent transition-all",
+                              isListening && "bg-red-500/20 dark:bg-red-500/20 animate-pulse",
+                              isPlayingTTS && "bg-blue-500/20 dark:bg-blue-500/20"
+                            )}
+                            title={
+                              isListening 
+                                ? "Stop recording" 
+                                : isPlayingTTS 
+                                ? "Playing audio..." 
+                                : "Start voice input"
+                            }
+                          >
+                            {isGeneratingTTS ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>Generating...</span>
+                              </>
+                            ) : isPlayingTTS ? (
+                              <>
+                                <MicOff className="w-3.5 h-3.5 text-blue-500" />
+                                <span className="text-blue-500">Playing</span>
+                              </>
+                            ) : isListening ? (
+                              <>
+                                <MicOff className="w-3.5 h-3.5 text-red-500" />
+                                <span className="text-red-500">Stop</span>
+                              </>
+                            ) : (
+                              <>
+                                <Mic className="w-3.5 h-3.5" />
+                                <span>Voice</span>
+                              </>
+                            )}
+                          </Button>
+
                           <Button
                             variant="ghost"
                             size="sm"

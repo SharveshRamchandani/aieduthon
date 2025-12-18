@@ -30,3 +30,6 @@ jsonschema==4.23.0
 
 # PDF generation (pure Python, no external tools required)
 reportlab==4.0.7
+
+# Text-to-Speech
+gtts==2.5.1

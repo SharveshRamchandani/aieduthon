@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Download, ChevronLeft, ChevronRight, Send, Image, Network, Loader2, Sparkles, Search, Type, LayoutGrid, Orbit, BarChart3, Film, Globe2, PenSquare, List, X, MessageSquare, MonitorPlay } from 'lucide-react';
-import { getDeck, generateMediaForDeck, exportDeck, generateSpeakerNotes, generateQuiz, downloadDeckImages, SlideDeck } from '@/lib/api';
+import { ExportDialog } from '@/components/ExportDialog';
+import { Plus, Trash2, Download, ChevronLeft, ChevronRight, Send, Image, Network, Loader2, Sparkles, Search, Type, LayoutGrid, Orbit, BarChart3, Film, Globe2, PenSquare, List, X, MessageSquare, MonitorPlay, RotateCcw } from 'lucide-react';
+import { getDeck, generateMediaForDeck, exportDeck, generateSpeakerNotes, generateQuiz, downloadDeckImages, SlideDeck, ExportStyle } from '@/lib/api';
 
 interface Slide {
   id: string;
@@ -26,6 +27,11 @@ interface Presentation {
   metadata?: any;
 }
 
+interface DeletedSlideEntry {
+  slide: Slide;
+  index: number;
+}
+
 const Editor = () => {
   const { id } = useParams();
   const [presentation, setPresentation] = useState<Presentation | null>(null);
@@ -37,6 +43,9 @@ const Editor = () => {
   const [viewMode, setViewMode] = useState<'filmstrip' | 'list'>('filmstrip');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isPresenting, setIsPresenting] = useState(false);
+  const [deletedSlides, setDeletedSlides] = useState<DeletedSlideEntry[]>([]);
+  const [exportStyle, setExportStyle] = useState<ExportStyle>('template');
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const { toast } = useToast();
   const defaultTitle = 'Agile Methodology in Software Development: Embracing Change for Success';
   const defaultContent = 'Discover how Agile transforms software development through flexibility, collaboration, and continuous improvement';
@@ -144,21 +153,45 @@ const Editor = () => {
     }
 
     const index = targetIndex ?? currentSlideIndex;
+    const deletedSlide = presentation.slides[index];
+
+    // Store deleted slide so user can undo the action
+    setDeletedSlides((prev) => [...prev, { slide: deletedSlide, index }]);
+
     const updatedSlides = presentation.slides.filter((_, i) => i !== index);
     savePresentation({ ...presentation, slides: updatedSlides });
     setCurrentSlideIndex(Math.max(0, index - 1));
   };
 
-  const exportPresentation = async () => {
+  const handleUndoDelete = () => {
+    if (!presentation || deletedSlides.length === 0) return;
+
+    const last = deletedSlides[deletedSlides.length - 1];
+    const restoredSlides = [...presentation.slides];
+    restoredSlides.splice(last.index, 0, last.slide);
+
+    const updated: Presentation = { ...presentation, slides: restoredSlides };
+    savePresentation(updated);
+    setCurrentSlideIndex(last.index);
+
+    setDeletedSlides((prev) => prev.slice(0, -1));
+  };
+
+  const handleExport = async (format: 'pptx' | 'pdf', style: ExportStyle) => {
     if (!id) return;
 
+    setExportStyle(style);
     setIsExporting(true);
     try {
-      await exportDeck(id);
+      await exportDeck(id, format, 'user', undefined, style);
       toast({
         title: 'Success',
-        description: 'Presentation exported successfully!',
+        description:
+          style === 'preview'
+            ? `Presentation exported in preview style as .${format}`
+            : `Presentation exported with template as .${format}`,
       });
+      setIsExportDialogOpen(false);
     } catch (err) {
       toast({
         title: 'Error',
@@ -277,7 +310,8 @@ const Editor = () => {
     if (!id) return;
 
     try {
-      const result = await generateQuiz(id, 'demo-user');
+      // Request quiz export as PDF so it downloads for the user
+      const result = await generateQuiz(id, 'demo-user', undefined, undefined, 'pdf');
       if (result && result.quiz_ids) {
         toast({
           title: 'Success',
@@ -312,6 +346,23 @@ const Editor = () => {
     const target = event.target as HTMLElement;
     if (target.closest('[data-editable]')) return;
     setCurrentSlideIndex(index);
+  };
+
+  const getPreviewSlides = (): Slide[] => {
+    if (!presentation || presentation.slides.length === 0) return [];
+    const baseSlides = presentation.slides;
+    const lastSlide = baseSlides[baseSlides.length - 1];
+
+    const thankYouSlide: Slide = {
+      id: 'thankyou-preview',
+      title: 'Thank you',
+      content: 'Questions or discussion',
+      imageUrl: lastSlide?.imageUrl || '',
+      diagramUrl: undefined,
+      speakerNotes: undefined,
+    };
+
+    return [...baseSlides, thankYouSlide];
   };
 
   // Scroll to current slide when it changes
@@ -413,59 +464,66 @@ const Editor = () => {
             </div>
           </div>
 
-          {/* Slide Thumbnails */}
+          {/* Slide Thumbnails (including synthetic Thank You slide at end) */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {presentation.slides.map((slide, index) => (
-              <div
-                key={slide.id}
-                id={`slide-thumbnail-${index}`}
-                className={`relative cursor-pointer rounded-lg border-2 transition-all ${
-                  currentSlideIndex === index
-                    ? 'border-primary shadow-lg shadow-primary/20'
-                    : 'border-border hover:border-muted-foreground/50'
-                }`}
-                onClick={() => {
-                  setCurrentSlideIndex(index);
-                  // Scroll to slide in main view
-                  const slideElement = document.getElementById(`main-slide-${index}`);
-                  if (slideElement) {
-                    slideElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }}
-              >
-                {/* Slide Number Badge */}
-                <div className="absolute bottom-2 left-2 z-10 h-6 w-6 rounded-full bg-card/90 border border-border flex items-center justify-center">
-                  <span className="text-xs font-medium text-foreground">{index + 1}</span>
-                </div>
+            {getPreviewSlides().map((slide, index, allSlides) => {
+              const isThankYou = index === allSlides.length - 1;
+              const logicalIndex = Math.min(index, Math.max(allSlides.length - 2, 0)); // last real slide
 
-                {/* Slide Thumbnail Preview */}
-                <div className="aspect-video relative overflow-hidden rounded-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-                  {slide.imageUrl && (
-                    <img
-                      src={slide.imageUrl}
-                      alt={slide.title}
-                      className="absolute inset-0 h-full w-full object-cover opacity-30"
-                    />
-                  )}
-                  
-                  <div className="absolute inset-0 p-3 flex flex-col justify-center">
-                    <h3 className="text-xs font-semibold text-white line-clamp-2 mb-1">
-                      {slide.title || `Slide ${index + 1}`}
-                    </h3>
-                    {viewMode === 'list' && (
-                      <p className="text-[10px] text-slate-300/70 line-clamp-2">
-                        {slide.content || ''}
-                      </p>
-                    )}
+              return (
+                <div
+                  key={slide.id}
+                  id={`slide-thumbnail-${index}`}
+                  className={`relative cursor-pointer rounded-lg border-2 transition-all ${
+                    !isThankYou && currentSlideIndex === index
+                      ? 'border-primary shadow-lg shadow-primary/20'
+                      : 'border-border hover:border-muted-foreground/50'
+                  }`}
+                  onClick={() => {
+                    if (isThankYou) return; // non-editable / non-selectable
+                    setCurrentSlideIndex(index);
+                    const slideElement = document.getElementById(`main-slide-${index}`);
+                    if (slideElement) {
+                      slideElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                >
+                  {/* Slide Number Badge */}
+                  <div className="absolute bottom-2 left-2 z-10 h-6 w-6 rounded-full bg-card/90 border border-border flex items-center justify-center">
+                    <span className="text-xs font-medium text-foreground">
+                      {isThankYou ? 'TY' : logicalIndex + 1}
+                    </span>
                   </div>
 
-                  {/* Selected indicator */}
-                  {currentSlideIndex === index && (
-                    <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
-                  )}
+                  {/* Slide Thumbnail Preview */}
+                  <div className="aspect-video relative overflow-hidden rounded-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+                    {slide.imageUrl && (
+                      <img
+                        src={slide.imageUrl}
+                        alt={slide.title}
+                        className="absolute inset-0 h-full w-full object-cover opacity-30"
+                      />
+                    )}
+                    
+                    <div className="absolute inset-0 p-3 flex flex-col justify-center">
+                      <h3 className="text-xs font-semibold text-white line-clamp-2 mb-1">
+                        {isThankYou ? 'Thank you' : slide.title || `Slide ${logicalIndex + 1}`}
+                      </h3>
+                      {viewMode === 'list' && !isThankYou && (
+                        <p className="text-[10px] text-slate-300/70 line-clamp-2">
+                          {slide.content || ''}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Selected indicator (only for real slides) */}
+                    {!isThankYou && currentSlideIndex === index && (
+                      <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -513,6 +571,17 @@ const Editor = () => {
           variant="ghost"
           size="icon"
           className="h-10 w-10 text-slate-200 hover:bg-muted"
+          aria-label="Undo delete slide"
+          title="Undo delete slide"
+          onClick={handleUndoDelete}
+          disabled={deletedSlides.length === 0}
+        >
+          <RotateCcw className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 text-slate-200 hover:bg-muted"
           aria-label="Download images"
           title="Download images ZIP"
           onClick={handleDownloadImages}
@@ -535,10 +604,14 @@ const Editor = () => {
           className="h-10 w-10 text-slate-200 hover:bg-muted"
           aria-label="Export"
           title="Export"
-          onClick={exportPresentation}
+          onClick={() => setIsExportDialogOpen(true)}
           disabled={isExporting}
         >
-          {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+          {isExporting ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <Download className="h-5 w-5" />
+          )}
         </Button>
         <Button
           variant="ghost"
@@ -585,7 +658,23 @@ const Editor = () => {
 
         <div className="container mx-auto px-4 pt-20 pb-16">
           <div className="space-y-10 pt-9">
-            {presentation.slides.map((slide, index) => (
+            {(() => {
+              const baseSlides = presentation.slides;
+              const lastSlide = baseSlides[baseSlides.length - 1];
+              const thankYouSlide: Slide = {
+                id: 'thankyou-preview',
+                title: 'Thank you',
+                content: 'Questions or discussion',
+                imageUrl: lastSlide?.imageUrl || '',
+                diagramUrl: undefined,
+                speakerNotes: undefined,
+              };
+              const previewSlides = [...baseSlides, thankYouSlide];
+
+              return previewSlides.map((slide, index) => {
+                const isThankYou = index === previewSlides.length - 1;
+
+                return (
               <div
                 key={slide.id}
                 id={`main-slide-${index}`}
@@ -618,60 +707,66 @@ const Editor = () => {
                 <div className="absolute left-6 top-8 h-16 w-1.5 rounded-full bg-primary shadow-[0_0_30px_rgba(59,130,246,0.45)]" />
 
                 <div className="relative z-10 max-w-2xl px-6 text-center space-y-4">
-                  <p className="text-xs uppercase tracking-[0.35em] text-primary/80">Presentation Preview</p>
+                  <p className="text-xs uppercase tracking-[0.35em] text-primary/80">
+                    {isThankYou ? 'Closing Slide' : 'Presentation Preview'}
+                  </p>
                   <div className="relative">
-                    <h1
-                      className="text-3xl md:text-4xl font-bold text-white leading-tight focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-2 min-h-[3rem] relative z-10"
-                      contentEditable
-                      suppressContentEditableWarning
-                      data-editable
-                      onInput={(e) => {
-                        const text = e.currentTarget.innerText;
-                        updateSlide(index, 'title', text);
-                      }}
-                      onBlur={(e) => {
-                        const text = e.currentTarget.innerText.trim();
-                        if (!text) {
-                          e.currentTarget.innerText = '';
-                        } else {
-                          e.currentTarget.innerText = text;
-                        }
-                        updateSlide(index, 'title', text);
-                      }}
-                      spellCheck={false}
-                    >
-                      {slide.title || ''}
-                    </h1>
-                    {!slide.title && (
+                    {isThankYou ? (
+                      <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight px-2 min-h-[3rem] relative z-10">
+                        Thank you
+                      </h1>
+                    ) : (
+                      <h1
+                        className="text-3xl md:text-4xl font-bold text-white leading-tight focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-2 min-h-[3rem] relative z-10"
+                        contentEditable
+                        suppressContentEditableWarning
+                        data-editable
+                        onBlur={(e) => {
+                          const text = e.currentTarget.innerText.trim();
+                          if (!text) {
+                            e.currentTarget.innerText = '';
+                          } else {
+                            e.currentTarget.innerText = text;
+                          }
+                          updateSlide(index, 'title', text);
+                        }}
+                        spellCheck={false}
+                      >
+                        {slide.title || ''}
+                      </h1>
+                    )}
+                    {!isThankYou && !slide.title && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                         <span className="text-3xl md:text-4xl font-bold text-white/50">{defaultTitle}</span>
                       </div>
                     )}
                   </div>
                   <div className="relative">
-                    <p
-                      className="text-base md:text-lg text-slate-200/80 whitespace-pre-line focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-3 py-2 min-h-[4rem] relative z-10"
-                      contentEditable
-                      suppressContentEditableWarning
-                      data-editable
-                      onInput={(e) => {
-                        const text = e.currentTarget.innerText;
-                        updateSlide(index, 'content', text);
-                      }}
-                      onBlur={(e) => {
-                        const text = e.currentTarget.innerText.trim();
-                        if (!text) {
-                          e.currentTarget.innerText = '';
-                        } else {
-                          e.currentTarget.innerText = text;
-                        }
-                        updateSlide(index, 'content', text);
-                      }}
-                      spellCheck={false}
-                    >
-                      {slide.content || ''}
-                    </p>
-                    {!slide.content && (
+                    {isThankYou ? (
+                      <p className="text-base md:text-lg text-slate-200/80 whitespace-pre-line px-3 py-2 min-h-[4rem] relative z-10">
+                        Questions or discussion
+                      </p>
+                    ) : (
+                      <p
+                        className="text-base md:text-lg text-slate-200/80 whitespace-pre-line focus:outline-none focus:ring-2 focus:ring-primary/60 rounded-md px-3 py-2 min-h-[4rem] relative z-10"
+                        contentEditable
+                        suppressContentEditableWarning
+                        data-editable
+                        onBlur={(e) => {
+                          const text = e.currentTarget.innerText.trim();
+                          if (!text) {
+                            e.currentTarget.innerText = '';
+                          } else {
+                            e.currentTarget.innerText = text;
+                          }
+                          updateSlide(index, 'content', text);
+                        }}
+                        spellCheck={false}
+                      >
+                        {slide.content || ''}
+                      </p>
+                    )}
+                    {!isThankYou && !slide.content && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                         <span className="text-base md:text-lg text-slate-300/50">{defaultContent}</span>
                       </div>
@@ -691,7 +786,9 @@ const Editor = () => {
               </div>
 
               </div>
-            ))}
+                );
+              });
+            })()}
           </div>
         </div>
       </div>
@@ -752,6 +849,14 @@ const Editor = () => {
           </div>
         </div>
       )}
+
+      <ExportDialog
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        onExport={handleExport}
+        isExporting={isExporting}
+        initialStyle={exportStyle}
+      />
     </div>
   );
 };

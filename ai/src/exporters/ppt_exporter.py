@@ -196,16 +196,28 @@ class PPTExporter:
 			"height": min(optimal_height, avail_h)
 		}
 
-	def export_deck(self, deck_id: str, output_dir: str = "..\\..\\out", user_name: str = "user") -> str:
-		"""Export slide deck to disk (legacy behavior)."""
-		prs, fname = self._build_presentation(deck_id, user_name)
+	def export_deck(self, deck_id: str, output_dir: str = "..\\..\\out", user_name: str = "user", export_style: str = "template") -> str:
+		"""Export slide deck to disk (legacy behavior).
+		
+		export_style:
+			- "template": use the configured PPT template (default)
+			- "preview": ignore template and render slides in the dark preview style
+		"""
+		prs, fname = self._build_presentation(deck_id, user_name, export_style=export_style)
 		out_dir = Path(output_dir).resolve()
 		out_dir.mkdir(parents=True, exist_ok=True)
 		output_path = out_dir / fname
 		prs.save(str(output_path))
 		return str(output_path)
 
-	def export_deck_to_bytes(self, deck_id: str, save_to_db: bool = True, user_name: str = "user", format_type: str = "pptx") -> Tuple[bytes, str]:
+	def export_deck_to_bytes(
+		self,
+		deck_id: str,
+		save_to_db: bool = True,
+		user_name: str = "user",
+		format_type: str = "pptx",
+		export_style: str = "template",
+	) -> Tuple[bytes, str]:
 		"""Return PPTX or PDF content as bytes plus suggested filename. Optionally save to database.
 		
 		Args:
@@ -213,11 +225,15 @@ class PPTExporter:
 			save_to_db: Whether to save to database
 			user_name: User name for filename
 			format_type: "pptx" or "pdf"
+			export_style: "template" or "preview"
 		"""
 		if format_type == "pdf":
-			return self._export_to_pdf(deck_id, user_name)
+			# For now, PDF export always uses the template-based presentation
+			# to preserve structure; we can later add a dedicated preview PDF
+			# layout if needed.
+			return self._export_to_pdf(deck_id, user_name, export_style=export_style)
 		
-		prs, fname = self._build_presentation(deck_id, user_name)
+		prs, fname = self._build_presentation(deck_id, user_name, export_style=export_style)
 		buffer = BytesIO()
 		prs.save(buffer)
 		ppt_bytes = buffer.getvalue()
@@ -228,7 +244,7 @@ class PPTExporter:
 		
 		return ppt_bytes, fname
 	
-	def _export_to_pdf(self, deck_id: str, user_name: str = "user") -> Tuple[bytes, str]:
+	def _export_to_pdf(self, deck_id: str, user_name: str = "user", export_style: str = "template") -> Tuple[bytes, str]:
 		"""Convert PPTX to PDF preserving template and formatting.
 		
 		Order of converters:
@@ -254,7 +270,7 @@ class PPTExporter:
 		title = deck.get("title", "AI Presentation")
 		
 		# Generate PPTX first (in memory)
-		prs, pptx_filename = self._build_presentation(deck_id, user_name)
+		prs, pptx_filename = self._build_presentation(deck_id, user_name, export_style=export_style)
 		
 		# Generate filename: Topic_user_date.pdf
 		safe_title = re.sub(r'[^\w\s-]', '', title)[:50].strip().replace(' ', '_')
@@ -592,7 +608,248 @@ class PPTExporter:
 		)
 		logger.info(f"Saved PPT file to database for deck {deck_id}")
 
-	def _build_presentation(self, deck_id: str, user_name: str = "user") -> Tuple[Presentation, str]:
+	def _build_preview_presentation(self, deck_id: str, user_name: str = "user") -> Tuple[Presentation, str]:
+		"""Build a PPT that mimics the web preview: dark background, white text, full-bleed image."""
+		try:
+			object_id = ObjectId(deck_id)
+		except Exception:
+			raise ValueError("Invalid deck_id. Must be a Mongo ObjectId hex string.")
+
+		deck = self.slides_collection.find_one({"_id": object_id})
+		if not deck:
+			raise FileNotFoundError("Slide deck not found")
+
+		title = deck.get("title", "Presentation")
+		sections: List[str] = deck.get("sections", [])
+		bullets: List[List[str]] = deck.get("bullets", [])
+		expanded_content: List[str] = deck.get("expanded_content", [])
+		generated_notes = deck.get("generated_notes", [])
+		media_refs = deck.get("media_refs", [])
+
+		prs = Presentation()
+		# Try to use a blank layout for maximum control
+		blank_layout = prs.slide_layouts[6] if len(prs.slide_layouts) > 6 else prs.slide_layouts[0]
+
+		from pptx.enum.text import PP_ALIGN, MSO_AUTO_SIZE
+
+		for idx, section in enumerate(sections):
+			slide = prs.slides.add_slide(blank_layout)
+
+			# Dark background similar to preview (slate-900)
+			bg_fill = slide.background.fill
+			bg_fill.solid()
+			bg_fill.fore_color.rgb = RGBColor(15, 23, 42)
+
+			# Full-bleed background image from first media ref if available
+			text_rgb = RGBColor(255, 255, 255)  # default to light text
+			slide_media = media_refs[idx] if idx < len(media_refs) else []
+			url = slide_media[0] if slide_media and isinstance(slide_media[0], str) else None
+			if url:
+				try:
+					resp = requests.get(url, timeout=15)
+					resp.raise_for_status()
+					tmp_path = Path(f"_preview_bg_{idx}.png")
+					tmp_path.write_bytes(resp.content)
+					try:
+						# Add image as full-bleed background
+						slide.shapes.add_picture(str(tmp_path), 0, 0, width=prs.slide_width, height=prs.slide_height)
+
+						# Sample brightness to choose light/dark text automatically
+						try:
+							with Image.open(str(tmp_path)) as im:
+								# Downscale for speed, convert to grayscale, compute mean brightness
+								im_small = im.resize((64, 64)).convert("L")
+								avg = sum(im_small.getdata()) / float(len(im_small.getdata()))
+								# If background is bright, use darker text; otherwise keep light text
+								if avg > 150:
+									# darker slate text
+									text_rgb = RGBColor(31, 41, 55)  # slate-800
+								else:
+									text_rgb = RGBColor(248, 250, 252)  # slate-50
+						except Exception as sample_err:
+							logger.debug(f"Failed to sample background brightness for slide {idx}: {sample_err}")
+					finally:
+						try:
+							tmp_path.unlink()
+						except OSError:
+							pass
+				except Exception as e:
+					logger.debug(f"Failed to add preview background image for slide {idx}: {e}")
+
+			# Derive main body text from generated notes / expanded content / bullets
+			expanded_text = generated_notes[idx] if idx < len(generated_notes) else ""
+			if not expanded_text and idx < len(expanded_content):
+				expanded_text = expanded_content[idx]
+			if not expanded_text and idx < len(bullets):
+				expanded_text = "\n".join(bullets[idx])
+
+			# Title textbox (top center, slightly inset from sides)
+			title_box = slide.shapes.add_textbox(
+				Inches(0.8),
+				Inches(0.8),
+				prs.slide_width - Inches(1.6),
+				Inches(2.0),
+			)
+			title_tf = title_box.text_frame
+			title_tf.clear()
+			try:
+				title_tf.word_wrap = True
+				title_tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+			except Exception:
+				pass
+			p_title = title_tf.paragraphs[0]
+			p_title.text = section or title
+			p_title.alignment = PP_ALIGN.CENTER
+			title_font = p_title.font
+			title_font.name = "Arial"
+			title_font.size = Pt(40)
+			title_font.bold = True
+			title_font.color.rgb = text_rgb
+
+			# Body textbox (centered, text color adapts to background)
+			# Body box starts a bit lower to avoid overlapping the title and has
+			# generous side margins so long lines wrap instead of running edge to edge.
+			body_box = slide.shapes.add_textbox(
+				Inches(0.9),
+				Inches(3.0),
+				prs.slide_width - Inches(1.8),
+				prs.slide_height - Inches(3.6),
+			)
+			body_tf = body_box.text_frame
+			body_tf.clear()
+			# Let PowerPoint try to shrink text to fit the shape and wrap lines
+			try:
+				body_tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+				body_tf.word_wrap = True
+				body_tf.margin_left = Inches(0.2)
+				body_tf.margin_right = Inches(0.2)
+			except Exception:
+				pass
+			p_body = body_tf.paragraphs[0]
+			p_body.alignment = PP_ALIGN.CENTER
+			body_font = p_body.font
+			body_font.name = "Arial"
+
+			# Heuristic font size based on total text length so long paragraphs
+			# shrink automatically and stay inside the frame.
+			total_len = len(str(expanded_text))
+			if total_len <= 500:
+				base_size = 24
+			elif total_len <= 900:
+				base_size = 18
+			elif total_len <= 1300:
+				base_size = 16
+			else:
+				base_size = 14
+			body_font.size = Pt(base_size)
+			body_font.color.rgb = text_rgb
+
+			if expanded_text:
+				for i, line in enumerate(str(expanded_text).split("\n")):
+					text = line.strip()
+					if not text:
+						continue
+					if i == 0:
+						p = p_body
+					else:
+						p = body_tf.add_paragraph()
+						p.alignment = PP_ALIGN.CENTER
+						p.font.name = body_font.name
+						p.font.size = body_font.size
+						p.font.color.rgb = body_font.color.rgb
+					p.text = text
+
+		# Add a minimalistic "Thank you" slide at the end in preview mode
+		if sections:
+			last_media = media_refs[len(sections) - 1] if len(media_refs) >= len(sections) else []
+			last_url = last_media[0] if last_media and isinstance(last_media[0], str) else None
+
+			slide = prs.slides.add_slide(blank_layout)
+
+			# Dark background
+			bg_fill = slide.background.fill
+			bg_fill.solid()
+			bg_fill.fore_color.rgb = RGBColor(15, 23, 42)
+
+			text_rgb = RGBColor(248, 250, 252)
+
+			# Use last slide image as a soft background if available
+			if last_url:
+				try:
+					resp = requests.get(last_url, timeout=15)
+					resp.raise_for_status()
+					tmp_path = Path("_preview_thankyou_bg.png")
+					tmp_path.write_bytes(resp.content)
+					try:
+						slide.shapes.add_picture(str(tmp_path), 0, 0, width=prs.slide_width, height=prs.slide_height)
+						try:
+							with Image.open(str(tmp_path)) as im:
+								im_small = im.resize((64, 64)).convert("L")
+								avg = sum(im_small.getdata()) / float(len(im_small.getdata()))
+								if avg > 150:
+									text_rgb = RGBColor(31, 41, 55)
+								else:
+									text_rgb = RGBColor(248, 250, 252)
+						except Exception as sample_err:
+							logger.debug(f"Failed to sample thank-you background brightness: {sample_err}")
+					finally:
+						try:
+							tmp_path.unlink()
+						except OSError:
+							pass
+				except Exception as e:
+					logger.debug(f"Failed to add thank-you background image: {e}")
+
+			from pptx.enum.text import PP_ALIGN
+
+			# Centered "Thank you" text
+			ty_box = slide.shapes.add_textbox(
+				Inches(1.0),
+				Inches(2.5),
+				prs.slide_width - Inches(2.0),
+				Inches(2.5),
+			)
+			ty_tf = ty_box.text_frame
+			ty_tf.clear()
+			ty_tf.word_wrap = True
+
+			p_ty = ty_tf.paragraphs[0]
+			p_ty.text = "Thank you"
+			p_ty.alignment = PP_ALIGN.CENTER
+			ty_font = p_ty.font
+			ty_font.name = "Arial"
+			ty_font.size = Pt(44)
+			ty_font.bold = True
+			ty_font.color.rgb = text_rgb
+
+			# Optional subtitle
+			p_sub = ty_tf.add_paragraph()
+			p_sub.text = "Questions or discussion"
+			p_sub.alignment = PP_ALIGN.CENTER
+			sub_font = p_sub.font
+			sub_font.name = "Arial"
+			sub_font.size = Pt(20)
+			sub_font.color.rgb = text_rgb
+
+		# Filename similar to template-based export
+		import re
+		safe_title = re.sub(r"[^\w\s-]", "", title)[:50].strip().replace(" ", "_")
+		if not safe_title:
+			safe_title = "Presentation"
+
+		safe_user = re.sub(r"[^\w\s-]", "", user_name)[:30].strip().replace(" ", "_")
+		if not safe_user:
+			safe_user = "user"
+
+		date_str = datetime.utcnow().strftime("%Y-%m-%d")
+		filename = f"{safe_title}_{safe_user}_{date_str}.pptx"
+
+		return prs, filename
+
+	def _build_presentation(self, deck_id: str, user_name: str = "user", export_style: str = "template") -> Tuple[Presentation, str]:
+		# If user requests preview-style export, bypass templates entirely.
+		if export_style == "preview":
+			return self._build_preview_presentation(deck_id, user_name)
 		try:
 			object_id = ObjectId(deck_id)
 		except Exception:
@@ -701,16 +958,62 @@ class PPTExporter:
 					slide.shapes.title.text = section
 
 			# Body text frame – fall back to a textbox if placeholder[1] is missing.
+			used_placeholder = True
 			try:
 				text_frame = slide.placeholders[1].text_frame
 			except Exception:
+				used_placeholder = False
 				box = slide.shapes.add_textbox(Inches(1.0), Inches(1.5), Inches(8.0), Inches(4.5))
 				text_frame = box.text_frame
 
 			# Capture the template's paragraph style before clearing so we can
 			# re-use its font, size, spacing, etc. for all generated content.
 			template_paragraph = text_frame.paragraphs[0] if text_frame.paragraphs else None
+
+			# If we had to create our own textbox (no placeholder), try to borrow
+			# style from the slide title so we still respect the template's font.
+			if (template_paragraph is None) and (not used_placeholder):
+				try:
+					title_shape = getattr(slide.shapes, "title", None)
+					if title_shape is not None and title_shape.text_frame.paragraphs:
+						template_paragraph = title_shape.text_frame.paragraphs[0]
+				except Exception:
+					template_paragraph = None
+
 			template_style = self._capture_paragraph_style(template_paragraph)
+
+			# Extra safety net: if we still don't have a style (e.g. a very
+			# minimal/clean template), synthesize a reasonable default based on
+			# the slide title font so content still looks like it belongs to
+			# the theme instead of falling back to a random system font.
+			if not template_style:
+				try:
+					title_shape = getattr(slide.shapes, "title", None)
+					title_paragraph = None
+					if title_shape is not None and title_shape.text_frame.paragraphs:
+						title_paragraph = title_shape.text_frame.paragraphs[0]
+					if title_paragraph is not None:
+						title_font = title_paragraph.font
+						from pptx.util import Pt as _Pt
+						template_style = {
+							"font_name": title_font.name,
+							# Use a slightly smaller size than the title if available,
+							# otherwise fall back to a reasonable body size.
+							"font_size": (
+								title_font.size * 0.7 if title_font.size is not None else _Pt(24)
+							),
+							"bold": False,
+							"italic": False,
+							"font_color": getattr(getattr(title_font, "color", None), "rgb", None),
+							"level": 0,
+							"alignment": None,
+							"space_after": None,
+							"space_before": None,
+						}
+				except Exception:
+					# If anything goes wrong here, we just keep template_style as-is
+					# and let PowerPoint/theme defaults take over.
+					pass
 
 			# Now clear out any existing template text so we don't stack on top.
 			text_frame.clear()

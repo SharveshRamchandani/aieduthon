@@ -18,6 +18,7 @@ class ExportRequest(BaseModel):
 	output_dir: str | None = None
 	format: str = "pptx"  # "pptx" or "pdf"
 	user_name: str = "user"  # User name for filename
+	export_style: str = "template"  # "template" or "preview"
 
 
 router = APIRouter()
@@ -34,7 +35,8 @@ def export_deck(deck_id: str, body: ExportRequest):
 			deck_id, 
 			save_to_db=(body.format == "pptx"),  # Only save PPTX to DB for now
 			user_name=body.user_name,
-			format_type=body.format
+			format_type=body.format,
+			export_style=body.export_style or "template",
 		)
 		
 		# Determine media type

@@ -36,13 +36,16 @@ const StyledWrapper = styled.div`
   width: 100%;
   height: 100%;
   min-height: 300px;
-  
+
   .slider {
     width: 100%;
     height: 100%;
     min-height: 300px;
     overflow: hidden;
     position: relative;
+
+    /* 👇 control spacing here */
+    --gap: 200px;
   }
 
   .list {
@@ -52,49 +55,45 @@ const StyledWrapper = styled.div`
     min-height: 300px;
   }
 
-  /* Vertical movement */
   .item {
     width: 100%;
     height: 100%;
     min-height: 300px;
     position: absolute;
     top: 100%;
-    animation: verticalRun 25s linear infinite; /* 🔥 faster loop */
+
+    animation: verticalRun 30s linear infinite;
     animation-delay: calc(
-      (10s / var(--quantity)) * (var(--position) - 1) - 10s
+      (30s / var(--quantity)) * (var(--position) - 1) - 30s
     );
   }
 
-  /* 🔽 tighter loop + spacing */
+  /* ✅ spacing is handled here */
   @keyframes verticalRun {
     from {
-      top: 100%;
+      top: calc(100% + var(--gap));
     }
     to {
-      top: calc(-100% - 10px); /* 🧱 20px space between images */
+      top: calc(-100% - var(--gap));
     }
   }
 
-  /* Bootstrap-like carousel-item */
   .carousel-item {
     width: 100%;
     height: 100%;
-    padding: 10px; /* ✅ fixed invalid CSS */
     box-sizing: border-box;
   }
 
   .carousel-item img {
     width: 100%;
     height: 100%;
-    max-width: 100%;
-    max-height: 100%;
     min-height: 200px;
     object-fit: cover;
     border-radius: 20px;
     display: block;
-    margin: 10 auto;
   }
 `;
+
 
 
 export default VerticalCarousel;

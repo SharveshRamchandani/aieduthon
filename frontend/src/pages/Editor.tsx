@@ -638,7 +638,7 @@ const Editor = () => {
       
 
       {/* AI Chat Button - Separate below toolbar */}
-      <div className="fixed right-4 top-[calc(50%+180px)] z-30">
+      <div className="fixed right-4 top-[calc(60%+160px)] z-30">
         <Button
           variant="default"
           size="lg"

@@ -1,10 +1,8 @@
 import React from "react";
 import styled from "styled-components";
-
+import { slide1,slide2,slide3,slide4,slide5,slide6,slide7 } from "@/assets";
 const slides = [
-  "https://images.unsplash.com/photo-1522202176988-66273c2fd55f",
-  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
-  "https://images.unsplash.com/photo-1498050108023-c5249f4df085",
+  slide1,slide2,slide3,slide4,slide5,slide6,slide7
 ];
 
 const VerticalCarousel = () => {
@@ -43,9 +41,9 @@ const StyledWrapper = styled.div`
     min-height: 300px;
     overflow: hidden;
     position: relative;
-
+    border-radius:10px;
     /* 👇 control spacing here */
-    --gap: 200px;
+    --gap: 950px;
   }
 
   .list {
@@ -62,9 +60,9 @@ const StyledWrapper = styled.div`
     position: absolute;
     top: 100%;
 
-    animation: verticalRun 30s linear infinite;
+    animation: verticalRun 50s linear infinite;
     animation-delay: calc(
-      (30s / var(--quantity)) * (var(--position) - 1) - 30s
+      (50s / var(--quantity)) * (var(--position) - 1) - 50s
     );
   }
 

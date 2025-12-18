@@ -150,8 +150,8 @@ const [displayedText1, setDisplayedText1] = useState('');
             
              {/* Row 1: Text on the left + right card */}
              <div className="flex items-top justify-start">
-              <div className="w-full lg:max-w-xl space-y-4 ">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-left">
+              <div className="w-full lg:max-w-2xl space-y-4 ">
+              <h2 className="text-6xl  font-bold mb-4   text-left">
                     Create professional, structured presentations in seconds with AI.
                   </h2>
                 
@@ -160,7 +160,7 @@ const [displayedText1, setDisplayedText1] = useState('');
             </div>
 
             <div className="flex justify-end">
-              <div className="w-full lg:w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
+              <div className="w-full lg:w-[1000px] rounded-3xl p-2 border  hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
                 <div className="relative z-10">
                   
                 </div>
@@ -198,7 +198,7 @@ const [displayedText1, setDisplayedText1] = useState('');
 
            <div className="flex items-start justify-end pt-10">
               <div className="w-full lg:max-w-xl space-y-4 ">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-right">
+              <h2 className="text-6xl  font-bold mb-4 leading-tight text-right">
                    Simply define your topic, and our ai generates attractive, editable tailored presentations.
                                      </h2>
                 
@@ -210,7 +210,7 @@ const [displayedText1, setDisplayedText1] = useState('');
           </div>
 
 
-  <div className="min-h-screen flex items-center justify-center ">
+  {/* <div className="min-h-screen flex items-center justify-center ">
   <div className="w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
     <div className="relative z-10"></div>
     <h1 className="text-5xl font-bold mb-8 leading-tight text-center">
@@ -220,17 +220,21 @@ const [displayedText1, setDisplayedText1] = useState('');
       <div className="p-6"></div>
     </div>
   </div>
-</div>
-  
+</div> */}
+   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-[1400px] mx-auto">
   <div className="pt-10">
-<h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-left">
+<h2 className="text-4xl md:text-7xl font-bold mb-4 leading-tight text-left ">
                     <span className="text-accent-brown block">
                       {displayedText1}
                       {showCursor1 && <span className="animate-pulse">|</span>}
                     </span>
                   </h2>
+               
+
+                </div>
+
                 
-    <div className="relative z-10 top-10 ">
+    <div className="relative z-10 top-20 right-20">
 <div className=" items-center justify-center  ">
       <Animation1 />
     </div>

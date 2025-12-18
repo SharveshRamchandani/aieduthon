@@ -195,10 +195,7 @@ const [displayedText1, setDisplayedText1] = useState('');
              <div className="flex items-center justify-start">
               <div className="w-full lg:max-w-xl space-y-4 ">
               <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-left">
-                    <span className="text-accent-brown block">
-                      {displayedText1}
-                      {showCursor2 && <span className="animate-pulse">|</span>}
-                    </span>
+                    Create professional, structured presentations in seconds with AI.
                   </h2>
                 
                 
@@ -206,7 +203,7 @@ const [displayedText1, setDisplayedText1] = useState('');
             </div>
 
             <div className="flex justify-end">
-              <div className="w-full lg:w-[1100px] rounded-3xl p-8 border hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
+              <div className="w-full lg:w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
                 <div className="relative z-10">
                   
                 </div>
@@ -226,12 +223,12 @@ const [displayedText1, setDisplayedText1] = useState('');
             
             {/* Row 2: Left card + text on the right */}
             <div className="flex justify-end  ">
-              <div className="w-full lg:w-[1100px] rounded-3xl p-8 border hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
+              <div className="w-full lg:w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
                 <div className="relative z-10">
                   
                 </div>
 
-                <div className="absolute left-[-40px] bottom-[-40px] w-3/4 h-3/4 rounded-tl-3xl border-t border-l transition-transform group-hover:scale-105 group-hover:-translate-x-2 group-hover:-translate-y-2 bg-white/20 border-white/30 dark:bg-gray-100 dark:border-gray-200">
+                  <div className="absolute left-[-40px] bottom-[-40px] w-3/4 h-3/4 rounded-tl-3xl border-t border-r transition-transform group-hover:scale-105 group-hover:-translate-x-2 group-hover:-translate-y-2 bg-white/20 border-white/30 dark:bg-gray-100 dark:border-gray-200">
                   <div className="p-6">
                     <div className="w-full h-8 rounded mb-4 bg-white/40 dark:bg-gray-300" />
                     <div className="grid grid-cols-2 gap-4">
@@ -243,14 +240,12 @@ const [displayedText1, setDisplayedText1] = useState('');
               </div>
             </div>
 
-            <div className="flex items-right">
-              <div className="w-full lg:max-w-md space-y-4">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight ">
-                    <span className="text-accent-brown block">
-                      {displayedText2}
-                      {showCursor2 && <span className="animate-pulse">|</span>}
-                    </span>
+           <div className="flex items-center justify-end">
+              <div className="w-full lg:max-w-xl space-y-4 ">
+              <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-right">
+                    Create professional, structured presentations in seconds with AI.
                   </h2>
+                
                 
               </div>
             </div>
@@ -261,7 +256,7 @@ const [displayedText1, setDisplayedText1] = useState('');
 <div className="pt-10 flex items-center justify-center ">
   
   <div className="w-[1000px] rounded-3xl p-6 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
-     <h1 className="text-5xl font-bold  text-center pt-10">
+     <h1 className="text-5xl font-bold  text-left pt-10">
        Let Coco watch your you ppt being generated. Till then just relax.
       </h1>
     <div className="relative z-10 top-20 ">

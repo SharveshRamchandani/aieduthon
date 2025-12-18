@@ -9,6 +9,7 @@ import {
   ArrowRight, CheckCircle2, Zap, LayoutTemplate, 
   Sparkles, Globe, FileText, Presentation 
 } from 'lucide-react';
+import Animation1 from "@/components/Animation";
 
 
 const Landing = () => {
@@ -257,12 +258,18 @@ const [displayedText1, setDisplayedText1] = useState('');
            
           </div>
 
-<div className="min-h-screen flex items-center justify-center ">
-  <div className="w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
-    <div className="relative z-10"></div>
-    <h1 className="text-5xl font-bold mb-8 leading-tight text-center">
-       Extra content
+<div className="pt-10 flex items-center justify-center ">
+  
+  <div className="w-[1000px] rounded-3xl p-6 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
+     <h1 className="text-5xl font-bold  text-center pt-10">
+       Let Coco watch your you ppt being generated. Till then just relax.
       </h1>
+    <div className="relative z-10 top-20 ">
+<div className=" items-center justify-center  ">
+      <Animation1 />
+    </div>
+    </div>
+    
     <div>
       <div className="p-6"></div>
     </div>

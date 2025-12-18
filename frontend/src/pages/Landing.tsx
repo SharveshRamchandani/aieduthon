@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Animation1 from "@/components/Animation";
 import VerticalCarousel from "@/components/Carousel";
+import { Footer7 } from "@/components/Footer";
 
 
 const Landing = () => {
@@ -244,7 +245,7 @@ const [displayedText1, setDisplayedText1] = useState('');
      
     
    
-  
+  <Footer7 />
 
 
                  

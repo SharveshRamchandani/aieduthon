@@ -42,21 +42,20 @@ const Landing = () => {
   }, [titleNumber, titles]);
 const [displayedText1, setDisplayedText1] = useState('');
   const [displayedText2, setDisplayedText2] = useState('');
-  const [displayedSubtitle, setDisplayedSubtitle] = useState('');
+
   const [showCursor1, setShowCursor1] = useState(true);
-  const [showCursor2, setShowCursor2] = useState(false);
+  
   const [showCursorSubtitle, setShowCursorSubtitle] = useState(false);
 
-  const text1 = "Create professional, structured presentations in seconds with AI.";
-  const text2 = "Simply describe your topic, and watch as our intelligent system generates beautiful, editable slides tailored for education."
-  const subtitle = '  ';
+  const text1 = "Let coco look after your ppt. Just chill!!!";
+  
 
   useEffect(() => {
     let timeout1: ReturnType<typeof setTimeout>;
     let timeout2: ReturnType<typeof setTimeout>;
-    let timeout3: ReturnType<typeof setTimeout>;
+
     let cursorTimeout1: ReturnType<typeof setTimeout>;
-    let cursorTimeout2: ReturnType<typeof setTimeout>;
+   
 
     // First line typewriter
     const typeText1 = () => {
@@ -66,53 +65,12 @@ const [displayedText1, setDisplayedText1] = useState('');
           setDisplayedText1(text1.slice(0, i + 1));
           i++;
           timeout1 = setTimeout(type, 100);
-        } else {
-          // Hide cursor for first line and start second line
-          cursorTimeout1 = setTimeout(() => {
-            setShowCursor1(false);
-            setShowCursor2(true);
-            typeText2();
-          }, 500);
-        }
+        } 
       };
       type();
     };
 
-    // Second line typewriter
-    const typeText2 = () => {
-      let i = 0;
-      const type = () => {
-        if (i < text2.length) {
-          setDisplayedText2(text2.slice(0, i + 1));
-          i++;
-          timeout2 = setTimeout(type, 100);
-        } else {
-          // Hide cursor for second line and start subtitle
-          cursorTimeout2 = setTimeout(() => {
-            setShowCursor2(false);
-            setShowCursorSubtitle(true);
-            typeSubtitle();
-          }, 500);
-        }
-      };
-      type();
-    };
-
-    // Subtitle typewriter
-    const typeSubtitle = () => {
-      let i = 0;
-      const type = () => {
-        if (i < subtitle.length) {
-          setDisplayedSubtitle(subtitle.slice(0, i + 1));
-          i++;
-          timeout3 = setTimeout(type, 50);
-        } else {
-          // Hide subtitle cursor after completion
-          setTimeout(() => setShowCursorSubtitle(false), 1000);
-        }
-      };
-      type();
-    };
+    
 
     // Start the animation
     typeText1();
@@ -120,10 +78,8 @@ const [displayedText1, setDisplayedText1] = useState('');
     // Cleanup
     return () => {
       clearTimeout(timeout1);
-      clearTimeout(timeout2);
-      clearTimeout(timeout3);
-      clearTimeout(cursorTimeout1);
-      clearTimeout(cursorTimeout2);
+   
+   
     };
   }, []);
 
@@ -165,7 +121,7 @@ const [displayedText1, setDisplayedText1] = useState('');
               </div>
             </h1>
 
-          <div className="flex gap-4 flex-col items-center pt-8 pb-16">
+          <div className="flex gap-4 flex-col items-center pt-16 pb-24">
             <button className="btn" onClick={handleGetStarted}>
               <svg
                 className="sparkle"
@@ -192,7 +148,7 @@ const [displayedText1, setDisplayedText1] = useState('');
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-[1400px] mx-auto">
             
              {/* Row 1: Text on the left + right card */}
-             <div className="flex items-center justify-start">
+             <div className="flex items-top justify-start">
               <div className="w-full lg:max-w-xl space-y-4 ">
               <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-left">
                     Create professional, structured presentations in seconds with AI.
@@ -222,7 +178,8 @@ const [displayedText1, setDisplayedText1] = useState('');
             
             
             {/* Row 2: Left card + text on the right */}
-            <div className="flex justify-end  ">
+            
+            <div className="flex justify-end pt-10 ">
               <div className="w-full lg:w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
                 <div className="relative z-10">
                   
@@ -240,11 +197,11 @@ const [displayedText1, setDisplayedText1] = useState('');
               </div>
             </div>
 
-           <div className="flex items-center justify-end">
+           <div className="flex items-start justify-end pt-10">
               <div className="w-full lg:max-w-xl space-y-4 ">
               <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-right">
-                    Create professional, structured presentations in seconds with AI.
-                  </h2>
+                   Simply define your topic, and our ai generates attractive, editable tailored presentations.
+                                     </h2>
                 
                 
               </div>
@@ -256,9 +213,13 @@ const [displayedText1, setDisplayedText1] = useState('');
 <div className="pt-10 flex items-center justify-center ">
   
   <div className="w-[1000px] rounded-3xl p-6 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
-     <h1 className="text-5xl font-bold  text-left pt-10">
-       Let Coco watch your you ppt being generated. Till then just relax.
-      </h1>
+     <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-left">
+                    <span className="text-accent-brown block">
+                      {displayedText1}
+                      {showCursor1 && <span className="animate-pulse">|</span>}
+                    </span>
+                  </h2>
+                
     <div className="relative z-10 top-20 ">
 <div className=" items-center justify-center  ">
       <Animation1 />

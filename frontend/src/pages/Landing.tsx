@@ -10,6 +10,7 @@ import {
   Sparkles, Globe, FileText, Presentation 
 } from 'lucide-react';
 import Animation1 from "@/components/Animation";
+import VerticalCarousel from "@/components/Carousel";
 
 
 const Landing = () => {
@@ -164,14 +165,12 @@ const [displayedText1, setDisplayedText1] = useState('');
                   
                 </div>
 
-                <div className="absolute right-[-40px] bottom-[-40px] w-3/4 h-3/4 rounded-tl-3xl border-t border-l transition-transform group-hover:scale-105 group-hover:-translate-x-2 group-hover:-translate-y-2 bg-white/20 border-white/30 dark:bg-gray-100 dark:border-gray-200">
-                  <div className="p-6">
-                    <div className="w-full h-8 rounded mb-4 bg-white/40 dark:bg-gray-300" />
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="h-24 rounded bg-white/40 dark:bg-gray-200" />
-                      <div className="h-24 rounded bg-white/40 dark:bg-gray-200" />
+                
+                  <div className="p-4 h-full w-full flex items-center justify-center">
+                    <div className="w-full h-full" style={{ height: '100%', minHeight: '350px' }}>
+                      <VerticalCarousel />
                     </div>
-                  </div>
+                  
                 </div>
               </div>
             </div>
@@ -210,27 +209,39 @@ const [displayedText1, setDisplayedText1] = useState('');
            
           </div>
 
-<div className="pt-10 flex items-center justify-center ">
+
+  <div className="min-h-screen flex items-center justify-center ">
+  <div className="w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
+    <div className="relative z-10"></div>
+    <h1 className="text-5xl font-bold mb-8 leading-tight text-center">
+       Extra content
+      </h1>
+    <div>
+      <div className="p-6"></div>
+    </div>
+  </div>
+</div>
   
-  <div className="w-[1000px] rounded-3xl p-6 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
-     <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-left">
+  <div className="pt-10">
+<h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-left">
                     <span className="text-accent-brown block">
                       {displayedText1}
                       {showCursor1 && <span className="animate-pulse">|</span>}
                     </span>
                   </h2>
                 
-    <div className="relative z-10 top-20 ">
+    <div className="relative z-10 top-10 ">
 <div className=" items-center justify-center  ">
       <Animation1 />
     </div>
     </div>
-    
-    <div>
-      <div className="p-6"></div>
-    </div>
   </div>
-</div>
+  
+     
+    
+   
+  
+
 
                  
           </div>

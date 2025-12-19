@@ -49,7 +49,11 @@ func Routes(r *gin.Engine) {
 			c.JSON(200, gin.H{"msg": "hello protected", "claims": claims})
 		})
 
+		//All post queries.
 		authorized.POST("/orchestrate", handlers.Orchestrate)
 		authorized.POST("/generate-text", handlers.GenerateText)
+		authorized.POST("/generate-image",handlers.GenerateImages)
+		authorized.POST("/generate-diagram",handlers.GenerateDiagram)
+		
 	}
 }

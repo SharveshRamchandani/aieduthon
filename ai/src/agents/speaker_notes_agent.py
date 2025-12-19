@@ -40,7 +40,8 @@ class SpeakerNotesAgent:
 						   deck_id: str, 
 						   user_id: str,
 						   audience_level: Optional[str] = None,
-						   presentation_style: str = "educational") -> Dict[str, Any]:
+						   presentation_style: str = "educational",
+						   skip_db: bool = False) -> Dict[str, Any]:
 		"""
 		Generate speaker notes for slide deck
 		
@@ -68,15 +69,17 @@ class SpeakerNotesAgent:
 				note = self._generate_slide_notes(section, bullets, context, i)
 				speaker_notes.append(note)
 			
-			# Store speaker notes
-			self._store_speaker_notes(deck_id, speaker_notes, user_id)
+			# Store speaker notes (skip if skip_db)
+			if not skip_db:
+				self._store_speaker_notes(deck_id, speaker_notes, user_id)
 			
-			# Emit analytics event
-			self._emit_analytics_event(user_id, deck_id, "speaker_notes_generated", {
-				"total_slides": len(speaker_notes),
-				"audience_level": context["audience_level"],
-				"presentation_style": presentation_style
-			})
+			# Emit analytics event (skip if skip_db)
+			if not skip_db:
+				self._emit_analytics_event(user_id, deck_id, "speaker_notes_generated", {
+					"total_slides": len(speaker_notes),
+					"audience_level": context["audience_level"],
+					"presentation_style": presentation_style
+				})
 			
 			return {
 				"success": True,

@@ -7,8 +7,11 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/SharveshRamchandani/aieduthon.git/internal/db/post"
+	"github.com/SharveshRamchandani/aieduthon.git/internal/db/update"
 	logger "github.com/SharveshRamchandani/aieduthon.git/internal/log"
 	interaction "github.com/SharveshRamchandani/aieduthon.git/internal/modals/Interaction"
+	mongodb "github.com/SharveshRamchandani/aieduthon.git/internal/modals/mongoDB"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -97,6 +100,20 @@ func Orchestrate(c *gin.Context) {
 	}
 	logger.Log.Debug("Successfully parsed struct to json", zap.String("data", string(jsonData)))
 
+	// Store prompt in database before calling AI
+	promptID, err := post.CreatePrompt(
+		input.UserId,
+		input.Prompt,
+		input.Locale,
+		input.Context,
+	)
+	if err != nil {
+		logger.Log.Error("Failed to create prompt in database", zap.Error(err))
+		// Continue anyway - AI might still create it
+	} else {
+		logger.Log.Debug("Prompt created in database", zap.String("prompt_id", promptID))
+	}
+
 	orchestrateURL := fmt.Sprintf("%s/orchestrate", os.Getenv("AI_URL"))
 	logger.Log.Debug("The AI url", zap.String("url", orchestrateURL))
 
@@ -116,6 +133,138 @@ func Orchestrate(c *gin.Context) {
 		return
 	}
 	logger.Log.Info("Response data : ", zap.Any("Data: ", responseBody))
+
+	// Store data returned from AI (since AI now returns data instead of storing)
+	var actualPromptID string
+	var actualDeckID string
+
+	// 1. Store prompt data if present
+	if promptData, ok := responseBody["prompt_data"].(map[string]interface{}); ok {
+		promptID, err := post.CreatePrompt(
+			promptData["userId"].(string),
+			promptData["prompt_text"].(string),
+			promptData["locale"].(string),
+			promptData["context"].(map[string]interface{}),
+		)
+		if err != nil {
+			logger.Log.Warn("Failed to store prompt data", zap.Error(err))
+		} else {
+			actualPromptID = promptID
+			responseBody["promptId"] = promptID
+		}
+	}
+
+	// 2. Store deck data if present
+	if deckData, ok := responseBody["deck_data"].(map[string]interface{}); ok {
+		// Use actual prompt ID if we just created it
+		promptIDForDeck := actualPromptID
+		if promptIDForDeck == "" {
+			if pid, ok := responseBody["promptId"].(string); ok {
+				promptIDForDeck = pid
+			}
+		}
+		if promptIDForDeck == "" {
+			// Use the prompt_id from deck_data if available
+			if pid, ok := deckData["promptId"].(string); ok {
+				promptIDForDeck = pid
+			}
+		}
+
+		deckID, err := post.CreateSlideDeck(promptIDForDeck, input.UserId, deckData)
+		if err != nil {
+			logger.Log.Warn("Failed to store deck data", zap.Error(err))
+		} else {
+			actualDeckID = deckID
+			responseBody["deckId"] = deckID
+		}
+	} else if deckID, ok := responseBody["deckId"].(string); ok && deckID != "" {
+		actualDeckID = deckID
+	}
+
+	// 3. Store quiz data if present
+	quizIDs := make([]string, 0)
+	if quizDataList, ok := responseBody["quiz_data"].([]interface{}); ok && len(quizDataList) > 0 && actualDeckID != "" {
+		for _, quizData := range quizDataList {
+			if quizMap, ok := quizData.(map[string]interface{}); ok {
+				quizID, err := post.CreateQuiz(actualDeckID, quizMap)
+				if err != nil {
+					logger.Log.Warn("Failed to store quiz data", zap.Error(err), zap.String("deck_id", actualDeckID))
+				} else {
+					quizIDs = append(quizIDs, quizID)
+				}
+			}
+		}
+		// Update response with actual quiz IDs
+		if len(quizIDs) > 0 {
+			responseBody["quizIds"] = quizIDs
+		}
+	}
+
+	// 4. Store speaker notes if present
+	if speakerNotesData, ok := responseBody["speaker_notes_data"].([]interface{}); ok && actualDeckID != "" {
+		// Convert to SpeakerNote structs
+		notes := make([]mongodb.SpeakerNote, 0, len(speakerNotesData))
+		for i, noteData := range speakerNotesData {
+			if noteMap, ok := noteData.(map[string]interface{}); ok {
+				note := mongodb.SpeakerNote{
+					SlideIndex: i,
+				}
+				if title, ok := noteMap["slide_title"].(string); ok {
+					note.SlideTitle = title
+				}
+				if points, ok := noteMap["main_points"].([]interface{}); ok {
+					note.KeyPoints = make([]string, len(points))
+					for j, p := range points {
+						if str, ok := p.(string); ok {
+							note.KeyPoints[j] = str
+						}
+					}
+				}
+				if examples, ok := noteMap["examples"].([]interface{}); ok {
+					note.Examples = make([]string, len(examples))
+					for j, e := range examples {
+						if str, ok := e.(string); ok {
+							note.Examples[j] = str
+						}
+					}
+				}
+				notes = append(notes, note)
+			}
+		}
+		if len(notes) > 0 {
+			if err := update.UpdateDeckSpeakerNotes(actualDeckID, notes); err != nil {
+				logger.Log.Warn("Failed to store speaker notes", zap.Error(err), zap.String("deck_id", actualDeckID))
+			}
+		}
+	}
+
+	// 5. Update deck with media refs if present
+	if actualDeckID != "" {
+		if mediaRefs, ok := responseBody["media_refs"]; ok {
+			if diagramRefs, ok := responseBody["diagram_refs"]; ok {
+				if mediaMetadata, ok := responseBody["media_metadata"]; ok {
+					if err := update.UpdateDeckMediaRefs(actualDeckID, mediaRefs, diagramRefs, mediaMetadata); err != nil {
+						logger.Log.Warn("Failed to update deck media refs", zap.Error(err), zap.String("deck_id", actualDeckID))
+					}
+				}
+			}
+		}
+
+		// 6. Update quiz refs if present
+		if quizIDs, ok := responseBody["quizIds"].([]interface{}); ok && len(quizIDs) > 0 {
+			quizRefs := make([]string, 0, len(quizIDs))
+			for _, id := range quizIDs {
+				if idStr, ok := id.(string); ok && idStr != "" {
+					quizRefs = append(quizRefs, idStr)
+				}
+			}
+			if len(quizRefs) > 0 {
+				if err := update.UpdateDeckQuizRefs(actualDeckID, quizRefs); err != nil {
+					logger.Log.Warn("Failed to update deck quiz refs", zap.Error(err), zap.String("deck_id", actualDeckID))
+				}
+			}
+		}
+	}
 
 	// Return the response with the same status code
 	c.JSON(res.StatusCode, responseBody)

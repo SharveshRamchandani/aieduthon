@@ -52,8 +52,16 @@ func Routes(r *gin.Engine) {
 		//All post queries.
 		authorized.POST("/orchestrate", handlers.Orchestrate)
 		authorized.POST("/generate-text", handlers.GenerateText)
-		authorized.POST("/generate-image",handlers.GenerateImages)
-		authorized.POST("/generate-diagram",handlers.GenerateDiagram)
-		
+		authorized.POST("/generate-image", handlers.GenerateImages)
+		authorized.POST("/generate-diagram", handlers.GenerateDiagram)
+
+		// Deck management endpoints
+		authorized.GET("/slides/:deck_id", handlers.GetDeck)
+		authorized.POST("/generate-media/:deck_id", handlers.GenerateMediaForDeck)
+		authorized.GET("/slides/:deck_id/images-zip", handlers.DownloadDeckImages)
+		authorized.POST("/slides/:deck_id/export", handlers.ExportDeck)
+		authorized.POST("/slides/:deck_id/speaker-notes", handlers.GenerateSpeakerNotes)
+		authorized.POST("/slides/:deck_id/quizzes", handlers.GenerateQuiz)
+
 	}
 }

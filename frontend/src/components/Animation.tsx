@@ -579,7 +579,7 @@ const StyledWrapper = styled.div`
 
   .dog__head {
     position: absolute;
-    left: 4.5vmax;
+    left: 2vmax;
     bottom: 0;
     width: 9.75vmax;
     height: 8.25vmax;
@@ -659,17 +659,7 @@ const StyledWrapper = styled.div`
     left: 65%;
   }
 
-  .dog__ear-l,
-  .dog__ear-r {
-    position: absolute;
-    width: 10.5vmax;
-    height: 3.375vmax;
-    border-top-left-radius: 0vmax;
-    border-top-right-radius: 0vmax;
-    border-bottom-right-radius: 3.3vmax;
-    border-bottom-left-radius: 3.3vmax;
-    background-color: #e26538;
-  }
+  
 
   .dog__ear-l {
     top: 1.5vmax;

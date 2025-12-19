@@ -10,6 +10,8 @@ import {
   Sparkles, Globe, FileText, Presentation 
 } from 'lucide-react';
 import Animation1 from "@/components/Animation";
+import VerticalCarousel from "@/components/Carousel";
+import { Footer7 } from "@/components/Footer";
 
 
 const Landing = () => {
@@ -149,8 +151,8 @@ const [displayedText1, setDisplayedText1] = useState('');
             
              {/* Row 1: Text on the left + right card */}
              <div className="flex items-top justify-start">
-              <div className="w-full lg:max-w-xl space-y-4 ">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-left">
+              <div className="w-full lg:max-w-2xl space-y-4 ">
+              <h2 className="text-6xl  font-bold mb-4   text-left">
                     Create professional, structured presentations in seconds with AI.
                   </h2>
                 
@@ -159,19 +161,17 @@ const [displayedText1, setDisplayedText1] = useState('');
             </div>
 
             <div className="flex justify-end">
-              <div className="w-full lg:w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
+              <div className="w-full lg:w-[1000px] rounded-3xl p-2 border  hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
                 <div className="relative z-10">
                   
                 </div>
 
-                <div className="absolute right-[-40px] bottom-[-40px] w-3/4 h-3/4 rounded-tl-3xl border-t border-l transition-transform group-hover:scale-105 group-hover:-translate-x-2 group-hover:-translate-y-2 bg-white/20 border-white/30 dark:bg-gray-100 dark:border-gray-200">
-                  <div className="p-6">
-                    <div className="w-full h-8 rounded mb-4 bg-white/40 dark:bg-gray-300" />
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="h-24 rounded bg-white/40 dark:bg-gray-200" />
-                      <div className="h-24 rounded bg-white/40 dark:bg-gray-200" />
+                
+                  <div className="p-4 h-full w-full flex items-center justify-center">
+                    <div className="w-full h-full" style={{ height: '100%', minHeight: '350px' }}>
+                      <VerticalCarousel />
                     </div>
-                  </div>
+                  
                 </div>
               </div>
             </div>
@@ -199,7 +199,7 @@ const [displayedText1, setDisplayedText1] = useState('');
 
            <div className="flex items-start justify-end pt-10">
               <div className="w-full lg:max-w-xl space-y-4 ">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-right">
+              <h2 className="text-6xl  font-bold mb-4 leading-tight text-right">
                    Simply define your topic, and our ai generates attractive, editable tailored presentations.
                                      </h2>
                 
@@ -210,27 +210,43 @@ const [displayedText1, setDisplayedText1] = useState('');
            
           </div>
 
-<div className="pt-10 flex items-center justify-center ">
-  
-  <div className="w-[1000px] rounded-3xl p-6 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
-     <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight text-left">
+
+  {/* <div className="min-h-screen flex items-center justify-center ">
+  <div className="w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
+    <div className="relative z-10"></div>
+    <h1 className="text-5xl font-bold mb-8 leading-tight text-center">
+       Extra content
+      </h1>
+    <div>
+      <div className="p-6"></div>
+    </div>
+  </div>
+</div> */}
+   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-[1400px] mx-auto">
+  <div className="pt-10">
+<h2 className="text-4xl md:text-7xl font-bold mb-4 leading-tight text-left ">
                     <span className="text-accent-brown block">
                       {displayedText1}
                       {showCursor1 && <span className="animate-pulse">|</span>}
                     </span>
                   </h2>
+               
+
+                </div>
+
                 
-    <div className="relative z-10 top-20 ">
+    <div className="relative z-10 top-20 right-20">
 <div className=" items-center justify-center  ">
       <Animation1 />
     </div>
     </div>
-    
-    <div>
-      <div className="p-6"></div>
-    </div>
   </div>
-</div>
+  
+     
+    
+   
+  <Footer7 />
+
 
                  
           </div>

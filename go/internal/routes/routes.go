@@ -50,5 +50,6 @@ func Routes(r *gin.Engine) {
 		})
 
 		authorized.POST("/orchestrate", handlers.Orchestrate)
+		authorized.POST("/generate-text", handlers.GenerateText)
 	}
 }

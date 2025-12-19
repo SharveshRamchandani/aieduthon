@@ -115,6 +115,7 @@ func Orchestrate(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
+	logger.Log.Info("Response data : ", zap.Any("Data: ", responseBody))
 
 	// Return the response with the same status code
 	c.JSON(res.StatusCode, responseBody)

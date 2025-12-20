@@ -363,117 +363,149 @@ const toggleHistorySidebar = () => {
       )}
       
       {/* Advanced Options Sidebar - On the right side */}
-      {isAdvancedOptionsOpen && (
-        <div className="fixed top-20 right-2 h-[calc(100vh-6rem)] w-96 bg-card border-l  z-50 border-border rounded-3xl scrollbar-hide">
-          <div className="p-6">
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Advanced Options</h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setIsAdvancedOptionsOpen(false)}
-                >
-                  ✕
-                </Button>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <Label>Grade Level (Optional)</Label>
-                    <Input
-                      placeholder="e.g., 10th, College"
-                      value={gradeLevel}
-                      onChange={(e) => setGradeLevel(e.target.value)}
-                      disabled={isGenerating}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Subject (Optional)</Label>
-                    <Input
-                      placeholder="e.g., Biology, Math"
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      disabled={isGenerating}
-                    />
-                  </div>
-                </div>
+     {isAdvancedOptionsOpen && (
+  <div className="fixed top-20 right-2 h-[calc(100vh-6rem)] w-96 bg-card border border-border z-50 rounded-3xl shadow-sm flex flex-col">
+    {/* Fixed Header Section */}
+    <div className="p-6 border-b border-border flex-shrink-0 rounded-t-3xl">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Advanced Options</h2>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => setIsAdvancedOptionsOpen(false)}
+        >
+          ✕
+        </Button>
+      </div>
+    </div>
 
-                <div className="space-y-2">
-                  <Label>Language</Label>
-                  <Select value={locale} onValueChange={setLocale} disabled={isGenerating}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="hi">Hindi</SelectItem>
-                      <SelectItem value="ta">Tamil</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Multimodal Features</Label>
-                  <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Image className="h-5 w-5" />
-                      <span>Generate Images</span>
-                    </div>
-                    <Switch
-                      checked={generateImages}
-                      onCheckedChange={setGenerateImages}
-                      disabled={isGenerating}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Network className="h-5 w-5" />
-                      <span>Generate Diagrams</span>
-                    </div>
-                    <Switch
-                      checked={generateDiagrams}
-                      onCheckedChange={setGenerateDiagrams}
-                      disabled={isGenerating}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Estimated Slides</Label>
-                  <Input
-                    type="number"
-                    min={3}
-                    max={30}
-                    placeholder="e.g., 10"
-                    value={estimatedSlides}
-                    onChange={(e) => setEstimatedSlides(e.target.value)}
-                    disabled={isGenerating}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Request between 3–30 slides (defaults to AI estimate if empty)
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>MCQs to Generate</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={50}
-                    placeholder="e.g., 8"
-                    value={quizCount}
-                    onChange={(e) => setQuizCount(e.target.value)}
-                    disabled={isGenerating}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Choose how many quiz MCQs to create (1–50). Defaults to 10 if empty.
-                  </p>
-                </div>
-              </div>
+    {/* Scrollable Content Section */}
+    <div 
+      className="flex-1 overflow-y-auto p-6 pt-4 scrollbar-custom"
+      style={{
+        scrollbarWidth: 'thin',
+        scrollbarColor: 'hsl(var(--foreground) / 0.3) transparent'
+      }}
+    >
+      <div className="space-y-6">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-2">
+              <Label>Grade Level (Optional)</Label>
+              <Input
+                placeholder="e.g., 10th, College"
+                value={gradeLevel}
+                onChange={(e) => setGradeLevel(e.target.value)}
+                disabled={isGenerating}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subject (Optional)</Label>
+              <Input
+                placeholder="e.g., Biology, Math"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                disabled={isGenerating}
+              />
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label>Language</Label>
+            <Select value={locale} onValueChange={setLocale} disabled={isGenerating}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="hi">Hindi</SelectItem>
+                <SelectItem value="ta">Tamil</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-base font-semibold">Multimodal Features</Label>
+            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <Image className="h-5 w-5" />
+                <span>Generate Images</span>
+              </div>
+              <Switch
+                checked={generateImages}
+                onCheckedChange={setGenerateImages}
+                disabled={isGenerating}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+              <div className="flex items-center gap-2">
+                <Network className="h-5 w-5" />
+                <span>Generate Diagrams</span>
+              </div>
+              <Switch
+                checked={generateDiagrams}
+                onCheckedChange={setGenerateDiagrams}
+                disabled={isGenerating}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Estimated Slides</Label>
+            <Input
+              type="number"
+              min={3}
+              max={30}
+              placeholder="e.g., 10"
+              value={estimatedSlides}
+              onChange={(e) => setEstimatedSlides(e.target.value)}
+              disabled={isGenerating}
+            />
+            <p className="text-xs text-muted-foreground">
+              Request between 3–30 slides (defaults to AI estimate if empty)
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>MCQs to Generate</Label>
+            <Input
+              type="number"
+              min={1}
+              max={50}
+              placeholder="e.g., 8"
+              value={quizCount}
+              onChange={(e) => setQuizCount(e.target.value)}
+              disabled={isGenerating}
+            />
+            <p className="text-xs text-muted-foreground">
+              Choose how many quiz MCQs to create (1–50). Defaults to 10 if empty.
+            </p>
+          </div>
         </div>
-      )}
+      </div>
+    </div>
+
+    {/* Custom Scrollbar Styles */}
+    <style jsx>{`
+      .scrollbar-custom::-webkit-scrollbar {
+        width: 6px;
+      }
+      
+      .scrollbar-custom::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 10px;
+      }
+      
+      .scrollbar-custom::-webkit-scrollbar-thumb {
+        background: hsl(var(--foreground) / 0.3);
+        border-radius: 10px;
+        transition: background 0.2s;
+      }
+      
+      .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--foreground) / 0.5);
+      }
+    `}</style>
+  </div>
+)}
 
       <div className="container mx-auto px-0 pt-44 pb-16">
         <div className="text-center space-y-4 mb-8">

@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkles, Image, Network, Loader2, Search, Palette, Settings, Globe, Paperclip, Send } from 'lucide-react';
+import { Sparkles, Image, Network, Loader2, Search, Palette, Settings,Menu ,ChevronLeft, Globe, Paperclip, Send } from 'lucide-react';
 import { orchestrate } from '@/lib/api';
 import { Textarea } from '@/components/ui/textarea';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -44,6 +44,41 @@ const Home = () => {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 164)}px`;
     }
   };
+  const presentations = [
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
+];
+
+// 🔹 Presentations sidebar state
+const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
+const [isMobileView, setIsMobileView] = useState(false);
+const [desktopHistoryState, setDesktopHistoryState] = useState(false);
+
+useEffect(() => {
+  const handleResize = () => {
+    const mobile = window.innerWidth < 1024;
+    setIsMobileView(mobile);
+
+    if (mobile) {
+      setDesktopHistoryState(isHistoryCollapsed);
+      setIsHistoryCollapsed(true);
+    } else {
+      setIsHistoryCollapsed(desktopHistoryState);
+    }
+  };
+
+  handleResize();
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+}, [desktopHistoryState, isHistoryCollapsed]);
+
+const toggleHistorySidebar = () => {
+  const next = !isHistoryCollapsed;
+  setIsHistoryCollapsed(next);
+  if (!isMobileView) setDesktopHistoryState(next);
+};
+
 
   // Sample themes data - in a real app this would come from an API
   const themes = [
@@ -136,6 +171,78 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
+<div
+  className={`transition-all duration-300
+  ${isHistoryCollapsed ? "ml-16" : "ml-20"}`}
+>
+      {/* 🔹 Presentations / History Sidebar */}
+<div
+  className={`fixed left-2 top-4 h-[calc(100vh-2rem)] bg-card
+  border border-border
+  rounded-2xl
+  transition-all duration-300 z-50 shadow-sm
+  ${isHistoryCollapsed ? "w-16" : "w-64"}`}
+>
+  <div className="pt-10 px-3 space-y-2">
+  {!isHistoryCollapsed && (
+    <h2 className="px-2 text-md font-bold uppercase tracking-wide text-muted-foreground mb-4">
+      Your Presentations
+    </h2>
+  )}
+
+  {presentations.map((p) => (
+    <button
+      key={p.id}
+      className={`
+        group w-full flex items-center gap-3
+        rounded-xl px-3 py-2.5
+        text-sm font-medium text-foreground
+        transition-all duration-200
+        hover:bg-accent/70
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+        ${isHistoryCollapsed ? "justify-center" : "justify-start"}
+      `}
+    >
+      {/* Icon */}
+      <span
+        className="
+          flex h-9 w-9 items-center justify-center
+          rounded-lg bg-muted text-muted-foreground
+          group-hover:bg-background group-hover:text-foreground
+          transition-colors
+        "
+      >
+        📄
+      </span>
+
+      {/* Title */}
+      {!isHistoryCollapsed && (
+        <span className="truncate">
+          {p.title}
+        </span>
+      )}
+    </button>
+  ))}
+</div>
+
+
+  {/* Toggle Button */}
+  <button
+    onClick={toggleHistorySidebar}
+    className="fixed bottom-16 z-40 bg-white text-black border border-border rounded-xl p-3 shadow-md"
+    style={{
+      left: isHistoryCollapsed ? "20px" : "240px",
+    }}
+  >
+    {isHistoryCollapsed ? (
+      <Menu className="w-4 h-4" />
+    ) : (
+      <ChevronLeft className="w-4 h-4" />
+    )}
+  </button>
+</div>
+
+
       
       {/* Themes Sidebar Overlay */}
       {isThemesSidebarOpen && (
@@ -451,6 +558,7 @@ const Home = () => {
           </div> */}
         </div>
       </div>
+    </div>
     </div>
   );
 };

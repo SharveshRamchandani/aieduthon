@@ -505,7 +505,7 @@ const Editor = () => {
 
               {/* Selected indicator (only for real slides) */}
               {!isThankYou && currentSlideIndex === index && (
-                <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
+                <div className="absolute inset-0 border-2 border-foreground rounded-lg pointer-events-none" />
               )}
             </div>
           </div>
@@ -551,7 +551,7 @@ const Editor = () => {
 )}
 
       {/* Main Content Area */}
-      <div className={`flex-1 transition-all ${isSidebarOpen ? 'ml-80' : 'ml-0'}`}>
+      <div className={`flex-1 transition-all ${isSidebarOpen ? 'ml-52' : 'ml-0'}`}>
         {/* Right-side vertical toolbar */}
         <div className="fixed right-4 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-3 rounded-2xl border border-border bg-card/95 shadow-xl p-3">
         
@@ -687,8 +687,8 @@ const Editor = () => {
               <div
                 key={slide.id}
                 id={`main-slide-${index}`}
-                className={`space-y-4 transition-all ${
-                  currentSlideIndex === index ? 'ring-2 ring-primary/50 rounded-2xl p-2' : ''
+                className={`space-y-10 transition-all ${
+                  currentSlideIndex === index ? 'ring-4 ring-foreground/0 rounded-2xl p-2' : ''
                 }`}
                 onClick={(e) => {
                   handleSlideClick(index, e);

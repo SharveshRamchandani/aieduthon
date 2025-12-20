@@ -147,58 +147,65 @@ const Home = () => {
       
       {/* Themes Sidebar - Now on the left side */}
       {isThemesSidebarOpen && (
-        <div className="fixed top-20 left-2 h-[calc(100vh-6rem)] w-96 bg-card z-50 overflow-y-auto border-border rounded-3xl scrollbar-hide">
-          <div className="p-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Themes</h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setIsThemesSidebarOpen(false)}
-                >
-                  ✕
-                </Button>
-              </div>
-              <p className="text-muted-foreground text-sm">
-                Choose a theme for your presentation or search for specific styles
-              </p>
-              
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search themes..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              
-              {/* Themes Grid */}
-              <div className="grid grid-cols-1 gap-3 mt-4">
-                {filteredThemes.map((theme) => (
-                  <div 
-                    key={theme.id}
-                    className="border border-border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors"
-                    onClick={() => setIsThemesSidebarOpen(false)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="text-2xl">{theme.preview}</div>
-                      <span className="font-medium text-sm">{theme.name}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+  <div className="fixed top-20 left-2 h-[calc(100vh-6rem)] w-96 bg-card z-50 border-border rounded-3xl overflow-hidden flex flex-col">
+    
+    {/* 🔒 Fixed / Sticky Header */}
+    <div className="p-6 border-b border-border bg-card sticky top-0 z-10">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Themes</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsThemesSidebarOpen(false)}
+          >
+            ✕
+          </Button>
+        </div>
+
+        <p className="text-muted-foreground text-sm">
+          Choose a theme for your presentation or search for specific styles
+        </p>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search themes..."
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* 🔽 Scrollable Content */}
+    <div className="flex-1 overflow-y-auto p-6">
+      <div className="grid grid-cols-1 gap-3">
+        {filteredThemes.map((theme) => (
+          <div
+            key={theme.id}
+            className="border border-border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors"
+            onClick={() => setIsThemesSidebarOpen(false)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="text-2xl">{theme.preview}</div>
+              <span className="font-medium text-sm">{theme.name}</span>
             </div>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
+    </div>
+
+  </div>
+)}
+
 
       {/* Advanced Options Sidebar Overlay */}
       {isAdvancedOptionsOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="fixed inset-0 bg-black bg-opacity-50 z-50"
           onClick={() => setIsAdvancedOptionsOpen(false)}
         ></div>
       )}

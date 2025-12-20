@@ -52,7 +52,7 @@ const [displayedText1, setDisplayedText1] = useState('');
   
   const [showCursorSubtitle, setShowCursorSubtitle] = useState(false);
 
-  const text1 = "While Coco generates your presentation, just sit back and relax!";
+  const text1 ="While Coco generates your presentation, just sit back and relax!";
   
   
 

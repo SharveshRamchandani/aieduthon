@@ -226,7 +226,15 @@ export async function downloadDeckImages(deckId: string): Promise<void> {
 }
 
 // Export Deck to PPTX or PDF
-export async function exportDeck(deckId: string, format: 'pptx' | 'pdf' = 'pptx', userName: string = 'user', outputDir?: string): Promise<void> {
+export type ExportStyle = 'template' | 'preview';
+
+export async function exportDeck(
+  deckId: string,
+  format: 'pptx' | 'pdf' = 'pptx',
+  userName: string = 'user',
+  outputDir?: string,
+  exportStyle: ExportStyle = 'template'
+): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/slides/${deckId}/export`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -234,7 +242,8 @@ export async function exportDeck(deckId: string, format: 'pptx' | 'pdf' = 'pptx'
     body: JSON.stringify({ 
       output_dir: outputDir,
       format: format,
-      user_name: userName
+      user_name: userName,
+      export_style: exportStyle,
     }),
   });
 

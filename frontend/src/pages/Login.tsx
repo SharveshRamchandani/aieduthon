@@ -70,38 +70,18 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-8">
+      <div className="w-full max-w-md space-y-8 ">
         <div className="bg-card border border-border rounded-2xl p-8 space-y-6">
           <div className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight">Welcome Back</h2>
-            <p className="text-muted-foreground mt-2">
+            <h2 className="text-4xl font-bold tracking-tight">Welcome Back</h2>
+            <p className="text-xl text-muted-foreground mt-2">
               Sign in to your account
             </p>
           </div>
 
-          {/* Google Login */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleGoogleLogin}
-            className="w-full h-12 rounded-xl"
-            data-testid="button-google"
-          >
-            <SiGoogle className="mr-2 h-4 w-4" />
-            Continue with Google
-          </Button>
+        
 
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">
-                Or continue with email
-              </span>
-            </div>
-          </div>
+          
 
           {/* Email/Password Form */}
           <form onSubmit={handleEmailLogin} className="space-y-4">
@@ -144,6 +124,30 @@ export default function Login() {
             >
               {isSubmitting ? "Signing in..." : "Sign In"}
             </Button>
+
+            {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">
+                Or continue with email
+              </span>
+            </div>
+          </div>
+
+            {/* Google Login */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGoogleLogin}
+            className="w-full h-12 rounded-xl"
+            data-testid="button-google"
+          >
+            <SiGoogle className="mr-2 h-4 w-4" />
+            Continue with Google
+          </Button>
           </form>
 
           {/* Sign Up Link */}

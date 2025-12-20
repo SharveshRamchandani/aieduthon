@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkles, Image, Network, Loader2, Search, Palette, Settings, Globe, Paperclip, Send } from 'lucide-react';
+import { Sparkles, Image, Network, Loader2, Search, Palette, Settings,Menu ,ChevronLeft, Globe, Paperclip, Send } from 'lucide-react';
 import { orchestrate } from '@/lib/api';
 import { Textarea } from '@/components/ui/textarea';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -44,6 +44,53 @@ const Home = () => {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 164)}px`;
     }
   };
+  const presentations = [
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
+];
+
+// 🔹 Presentations sidebar state
+const [isHistoryCollapsed, setIsHistoryCollapsed] = useState(false);
+const [isMobileView, setIsMobileView] = useState(false);
+const [desktopHistoryState, setDesktopHistoryState] = useState(false);
+
+useEffect(() => {
+  const handleResize = () => {
+    const mobile = window.innerWidth < 1024;
+    setIsMobileView(mobile);
+
+    if (mobile) {
+      setDesktopHistoryState(isHistoryCollapsed);
+      setIsHistoryCollapsed(true);
+    } else {
+      setIsHistoryCollapsed(desktopHistoryState);
+    }
+  };
+
+  handleResize();
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+}, [desktopHistoryState, isHistoryCollapsed]);
+
+const toggleHistorySidebar = () => {
+  const next = !isHistoryCollapsed;
+  setIsHistoryCollapsed(next);
+  if (!isMobileView) setDesktopHistoryState(next);
+};
+
 
   // Sample themes data - in a real app this would come from an API
   const themes = [
@@ -136,6 +183,111 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background">
       <TopBar />
+<div
+  className={`transition-all duration-300
+  ${isHistoryCollapsed ? "ml-16" : "ml-20"}`}
+>
+      {/* 🔹 Presentations / History Sidebar */}
+<div
+  className={`fixed left-2 top-4 h-[calc(100vh-2rem)] bg-card
+  border border-border
+  rounded-2xl
+  transition-all duration-300 z-50 shadow-sm
+  flex flex-col
+  ${isHistoryCollapsed ? "w-16" : "w-64"}`}
+>
+  {/* Fixed Header Section */}
+  <div className="pt-10 px-3 flex-shrink-0">
+    {!isHistoryCollapsed && (
+      <h2 className="px-2 text-md font-bold uppercase tracking-wide text-muted-foreground text-center mb-4">
+        Your Presentations
+      </h2>
+    )}
+    <div className="mx-2 mb-4 h-px bg-foreground" />
+  </div>
+
+  {/* Scrollable Content Section */}
+  <div 
+    className="flex-1 overflow-y-auto px-3 space-y-2 pb-20 scrollbar-custom"
+    style={{
+      scrollbarWidth: 'thin',
+      scrollbarColor: 'hsl(var(--foreground) / 0.3) transparent'
+    }}
+  >
+    {presentations.map((p) => (
+      <button
+        key={p.id}
+        className={`
+          group w-full flex items-center gap-3
+          rounded-xl px-3 py-2.5
+          text-sm font-medium text-foreground
+          transition-all duration-200
+          hover:bg-accent/70
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+          ${isHistoryCollapsed ? "justify-center" : "justify-start"}
+        `}
+      >
+        {/* Icon */}
+        <span
+          className="
+            flex h-9 w-9 items-center justify-center
+            rounded-lg bg-muted text-muted-foreground
+            group-hover:bg-background group-hover:text-foreground
+            transition-colors
+          "
+        >
+          📄
+        </span>
+
+        {/* Title */}
+        {!isHistoryCollapsed && (
+          <span className="truncate">
+            {p.title}
+          </span>
+        )}
+      </button>
+    ))}
+  </div>
+
+  {/* Toggle Button */}
+  <button
+    onClick={toggleHistorySidebar}
+    className="fixed bottom-16 z-40 bg-white text-black border border-border rounded-xl p-3 shadow-md"
+    style={{
+      left: isHistoryCollapsed ? "50px" : "240px",
+    }}
+  >
+    {isHistoryCollapsed ? (
+      <Menu className="w-4 h-4" />
+    ) : (
+      <ChevronLeft className="w-4 h-4" />
+    )}
+  </button>
+
+  {/* Custom Scrollbar Styles */}
+  <style jsx>{`
+    .scrollbar-custom::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .scrollbar-custom::-webkit-scrollbar-track {
+      background: transparent;
+      border-radius: 10px;
+    }
+    
+    .scrollbar-custom::-webkit-scrollbar-thumb {
+      background: hsl(var(--foreground) / 0.3);
+      border-radius: 10px;
+      transition: background 0.2s;
+    }
+    
+    .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+      background: hsl(var(--foreground) / 0.5);
+    }
+  `}</style>
+</div>
+
+
       
       {/* Themes Sidebar Overlay */}
       {isThemesSidebarOpen && (
@@ -147,58 +299,65 @@ const Home = () => {
       
       {/* Themes Sidebar - Now on the left side */}
       {isThemesSidebarOpen && (
-        <div className="fixed top-20 left-2 h-[calc(100vh-6rem)] w-96 bg-card z-50 overflow-y-auto border-border rounded-3xl scrollbar-hide">
-          <div className="p-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Themes</h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setIsThemesSidebarOpen(false)}
-                >
-                  ✕
-                </Button>
-              </div>
-              <p className="text-muted-foreground text-sm">
-                Choose a theme for your presentation or search for specific styles
-              </p>
-              
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search themes..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              
-              {/* Themes Grid */}
-              <div className="grid grid-cols-1 gap-3 mt-4">
-                {filteredThemes.map((theme) => (
-                  <div 
-                    key={theme.id}
-                    className="border border-border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors"
-                    onClick={() => setIsThemesSidebarOpen(false)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="text-2xl">{theme.preview}</div>
-                      <span className="font-medium text-sm">{theme.name}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+  <div className="fixed top-20 left-2 h-[calc(100vh-6rem)] w-96 bg-card z-50 border-border rounded-3xl overflow-hidden flex flex-col">
+    
+    {/* 🔒 Fixed / Sticky Header */}
+    <div className="p-6 border-b border-border bg-card sticky top-0 z-10">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Themes</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsThemesSidebarOpen(false)}
+          >
+            ✕
+          </Button>
+        </div>
+
+        <p className="text-muted-foreground text-sm">
+          Choose a theme for your presentation or search for specific styles
+        </p>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search themes..."
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* 🔽 Scrollable Content */}
+    <div className="flex-1 overflow-y-auto p-6">
+      <div className="grid grid-cols-1 gap-3">
+        {filteredThemes.map((theme) => (
+          <div
+            key={theme.id}
+            className="border border-border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors"
+            onClick={() => setIsThemesSidebarOpen(false)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="text-2xl">{theme.preview}</div>
+              <span className="font-medium text-sm">{theme.name}</span>
             </div>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
+    </div>
+
+  </div>
+)}
+
 
       {/* Advanced Options Sidebar Overlay */}
       {isAdvancedOptionsOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="fixed inset-0 bg-black bg-opacity-50 z-50"
           onClick={() => setIsAdvancedOptionsOpen(false)}
         ></div>
       )}
@@ -444,6 +603,7 @@ const Home = () => {
           </div> */}
         </div>
       </div>
+    </div>
     </div>
   );
 };

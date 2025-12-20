@@ -11,7 +11,6 @@ from agents.prompt_to_slide_agent import PromptToSlideAgent
 from agents.speaker_notes_agent import SpeakerNotesAgent
 from agents.quiz_generation_agent import QuizGenerationAgent
 from agents.media_integration_agent import MediaIntegrationAgent
-from agents.tts_agent import TTSAgent
 from exporters.ppt_exporter import PPTExporter
 from utils.ppt_checks import check_no_json_tokens, check_bullets_limit
 
@@ -27,8 +26,6 @@ class OrchestrateRequest(BaseModel):
 	presentation_style: str = "educational"
 	generate_images: bool = True
 	generate_diagrams: bool = True
-	generate_tts: bool = False
-	tts_slow: bool = False  # Whether to use slow speech for TTS
 	estimated_slides: Optional[int] = Field(default=None, ge=3, le=30)
 
 
@@ -102,21 +99,8 @@ def orchestrate(body: OrchestrateRequest):
 			# Media generation is optional, don't fail the entire request
 			pass
 
-	# 5) TTS Audio Generation (optional)
-	tts_result = None
-	if body.generate_tts:
-		try:
-			tts_agent = TTSAgent()
-			tts_result = tts_agent.generate_tts_for_deck(
-				deck_id=deck_id,
-				user_id=body.userId,
-				locale=body.locale,
-				slow=body.tts_slow
-			)
-		except Exception as e:
-			# TTS generation is optional, don't fail the entire request
-			logger.warning(f"TTS generation failed: {str(e)}")
-			pass
+	# 5) TTS Audio Generation (removed)
+	# tts_result = None
 
 	# 6) Export PPT as bytes via robust pipeline and run validation checks
 	ppt_bytes = None
@@ -140,9 +124,6 @@ def orchestrate(body: OrchestrateRequest):
 		"promptId": slides_result.get("prompt_id"),
 		"quizIds": quiz_result.get("quiz_ids", []),
 		"mediaGenerated": media_result.get("success", False) if media_result else False,
-		"ttsGenerated": tts_result.get("success", False) if tts_result else False,
-		"ttsFiles": tts_result.get("audio_files", []) if tts_result and tts_result.get("success") else [],
-		"ttsCombined": tts_result.get("combined_audio") if tts_result and tts_result.get("success") else None,
 		"pptFile": base64.b64encode(ppt_bytes).decode("utf-8") if ppt_bytes else None,
 		"pptFilename": ppt_filename,
 		"pptValidation": ppt_checks,

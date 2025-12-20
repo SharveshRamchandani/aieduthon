@@ -194,7 +194,8 @@ class TextGenerationAgent:
                  context: Optional[Dict] = None,
                  max_length: Optional[int] = None,
                  temperature: Optional[float] = None,
-                 use_cache: bool = True) -> Dict[str, Any]:
+                 use_cache: bool = True,
+                 response_mime_type: Optional[str] = None) -> Dict[str, Any]:
         """
         Generate text using LLM
         
@@ -293,7 +294,8 @@ class TextGenerationAgent:
                     formatted_prompt,
                     max_length=max_length,
                     temperature=temperature,
-                    config=text_config
+                    config=text_config,
+                    response_mime_type=response_mime_type
                 )
             elif provider == "local" and not use_api:
                 # Use local transformers model (legacy support)
@@ -543,7 +545,8 @@ class TextGenerationAgent:
                                   prompt: str,
                                   max_length: Optional[int] = None,
                                   temperature: Optional[float] = None,
-                                  config: Optional[Dict] = None) -> Dict[str, Any]:
+                                  config: Optional[Dict] = None,
+                                  response_mime_type: Optional[str] = None) -> Dict[str, Any]:
         """Generate text using Google Gemini API"""
         config_obj = get_config()
         gemini_api_key = config_obj.gemini_api_key
@@ -592,6 +595,9 @@ class TextGenerationAgent:
                 "topK": gen_config.get("top_k", 50)
             }
         }
+        
+        if response_mime_type:
+            payload["generationConfig"]["responseMimeType"] = response_mime_type
         
         try:
             logger.info(f"Calling Gemini API: {model_id}")
@@ -1229,26 +1235,33 @@ Keep language concise and avoid tokens like "Notes:", "```json", "{{", "}}".
 Return only valid JSON matching the schema above."""
         
         # Increase max_length to prevent truncation - expanded content needs more space
-        result = self.generate(prompt, context, max_length=8192)
+        result = self.generate(prompt, context, max_length=8192, response_mime_type="application/json")
         
         if result["success"]:
             # Try to parse JSON from response
             try:
                 # Extract JSON from response
                 json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
-                if json_match:
-                    content = json.loads(json_match.group())
-                    result["content"] = content
-                    aggregated_markers = list(result.get("image_markers", []))
-                    for slide in content.get("slides", []):
-                        for image in slide.get("images", []):
-                            aggregated_markers.append({
-                                "marker": image.get("marker"),
-                                "description": image.get("alt_text") or image.get("marker"),
-                                "placement": image.get("placement", "auto"),
-                                "slide_title": slide.get("title")
-                            })
-                    result["image_markers"] = aggregated_markers
+                json_str = json_match.group() if json_match else result["text"]
+                
+                try:
+                    content = json.loads(json_str)
+                except json.JSONDecodeError:
+                    # Try repair
+                    repaired = self._repair_json(json_str)
+                    content = json.loads(repaired)
+                    
+                result["content"] = content
+                aggregated_markers = list(result.get("image_markers", []))
+                for slide in content.get("slides", []):
+                    for image in slide.get("images", []):
+                        aggregated_markers.append({
+                            "marker": image.get("marker"),
+                            "description": image.get("alt_text") or image.get("marker"),
+                            "placement": image.get("placement", "auto"),
+                            "slide_title": slide.get("title")
+                        })
+                result["image_markers"] = aggregated_markers
             except Exception as e:
                 logger.warning(f"Failed to parse JSON from response: {e}")
                 # Fallback: structure the text manually
@@ -1291,7 +1304,7 @@ Existing slide JSON:
 {slide_json_text}
 """
         # Use Gemini for this expansion pass
-        result = self.generate(prompt, context, max_length=max_length)
+        result = self.generate(prompt, context, max_length=max_length, response_mime_type="application/json")
         
         if result.get("success"):
             try:
@@ -1306,8 +1319,14 @@ Existing slide JSON:
                 
                 # Parse expanded JSON
                 json_match = re.search(r'\{.*\}', result["text"], re.DOTALL)
-                if json_match:
-                    content = json.loads(json_match.group())
+                json_str = json_match.group() if json_match else result["text"]
+                
+                try:
+                    content = json.loads(json_str)
+                except json.JSONDecodeError:
+                    # Try repair
+                    repaired = self._repair_json(json_str)
+                    content = json.loads(repaired)
                     
                     # Preserve image placeholders from original (only if both slides are dicts)
                     if original_content:
@@ -1516,6 +1535,29 @@ Format your response as JSON:
         
         return result
     
+    def _repair_json(self, json_str: str) -> str:
+        """Attempt to repair invalid JSON string"""
+        if not json_str:
+            return "{}"
+            
+        # Try to fix common issues
+        # 1. Remove markdown code blocks if present (though _clean_markdown_formatting does this)
+        # 2. Fix trailing commas
+        cleaned = re.sub(r',(\s*[}\]])', r'\1', json_str)
+        # 3. Add missing closing braces/brackets if truncated
+        open_braces = cleaned.count('{') - cleaned.count('}')
+        if open_braces > 0:
+            cleaned += '}' * open_braces
+        
+        open_brackets = cleaned.count('[') - cleaned.count(']')
+        if open_brackets > 0:
+            cleaned += ']' * open_brackets
+            
+        # 4. Escape unescaped double quotes inside strings (heuristically)
+        # This is hard to do perfectly with regex but we can catch obvious ones
+        
+        return cleaned
+
     def generate_speaker_notes(self,
                                slide_title: str,
                                slide_content: List[str],

@@ -93,6 +93,9 @@ class StockImageAgent:
         """Search Unsplash API"""
         if not self.api_key:
             return {"success": False, "error": "Unsplash API key not configured"}
+            
+        if not query or not query.strip():
+            return {"success": False, "error": "Empty query", "results": []}
         
         try:
             provider_config = self.providers["unsplash"]

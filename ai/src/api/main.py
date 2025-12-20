@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .routes import slides, notes, quizzes, export, orchestrate, generate, tts
+from .routes import slides, notes, quizzes, export, orchestrate, generate
 
 
 def create_app() -> FastAPI:
@@ -21,7 +21,6 @@ def create_app() -> FastAPI:
 	app.include_router(notes.router, prefix="/slides", tags=["speaker-notes"])
 	app.include_router(quizzes.router, prefix="/slides", tags=["quizzes"])
 	app.include_router(export.router, prefix="/slides", tags=["export"])
-	app.include_router(tts.router, tags=["tts"])
 	app.include_router(orchestrate.router, tags=["orchestrate"])
 	app.include_router(generate.router, tags=["generate"])
 
@@ -32,16 +31,7 @@ def create_app() -> FastAPI:
 		name="media",
 	)
 	
-	# Serve TTS audio files
-	app.mount(
-		"/tts",
-		StaticFiles(directory="out/tts_audio"),
-		name="tts",
-	)
-
 	return app
 
 
 app = create_app()
-
-

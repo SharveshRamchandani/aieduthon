@@ -413,133 +413,142 @@ const Editor = () => {
   return (
     <div className="min-h-screen bg-background flex">
       <TopBar />
-
-      {/* Left Sidebar */}
-      {isSidebarOpen && (
-        <div className="fixed left-0 top-20 h-[calc(100vh-6rem)] w-80 bg-card border-r border-border z-20 flex flex-col">
-          {/* Top Bar */}
-          <div className="flex items-center justify-between p-3 border-b border-border bg-card">
-            <div className="flex items-center gap-2">
-              <p>Pages</p>
-              {/* <Button
-                variant="ghost"
-                size="icon"
-                className={`h-8 w-8 ${viewMode === 'filmstrip' ? 'bg-muted' : ''}`}
-                onClick={() => setViewMode('filmstrip')}
-                title="Filmstrip view"
-              >
-                <Film className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`h-8 w-8 ${viewMode === 'list' ? 'bg-muted' : ''}`}
-                onClick={() => setViewMode('list')}
-                title="List view"
-              >
-                <List className="h-4 w-4" />
-              </Button> */}
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-3 text-sm"
-                  onClick={addSlide}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  New
-                </Button>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setIsSidebarOpen(false)}
-                title="Close sidebar"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Slide Thumbnails (including synthetic Thank You slide at end) */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {getPreviewSlides().map((slide, index, allSlides) => {
-              const isThankYou = index === allSlides.length - 1;
-              const logicalIndex = Math.min(index, Math.max(allSlides.length - 2, 0)); // last real slide
-
-              return (
-                <div
-                  key={slide.id}
-                  id={`slide-thumbnail-${index}`}
-                  className={`relative cursor-pointer rounded-lg border-2 transition-all ${
-                    !isThankYou && currentSlideIndex === index
-                      ? 'border-primary shadow-lg shadow-primary/20'
-                      : 'border-border hover:border-muted-foreground/50'
-                  }`}
-                  onClick={() => {
-                    if (isThankYou) return; // non-editable / non-selectable
-                    setCurrentSlideIndex(index);
-                    const slideElement = document.getElementById(`main-slide-${index}`);
-                    if (slideElement) {
-                      slideElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                  }}
-                >
-                  {/* Slide Number Badge */}
-                  <div className="absolute bottom-2 left-2 z-10 h-6 w-6 rounded-full bg-card/90 border border-border flex items-center justify-center">
-                    <span className="text-xs font-medium text-foreground">
-                      {isThankYou ? 'TY' : logicalIndex + 1}
-                    </span>
-                  </div>
-
-                  {/* Slide Thumbnail Preview */}
-                  <div className="aspect-video relative overflow-hidden rounded-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-                    {slide.imageUrl && (
-                      <img
-                        src={slide.imageUrl}
-                        alt={slide.title}
-                        className="absolute inset-0 h-full w-full object-cover opacity-30"
-                      />
-                    )}
-                    
-                    <div className="absolute inset-0 p-3 flex flex-col justify-center">
-                      <h3 className="text-xs font-semibold text-white line-clamp-2 mb-1">
-                        {isThankYou ? 'Thank you' : slide.title || `Slide ${logicalIndex + 1}`}
-                      </h3>
-                      {viewMode === 'list' && !isThankYou && (
-                        <p className="text-[10px] text-slate-300/70 line-clamp-2">
-                          {slide.content || ''}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Selected indicator (only for real slides) */}
-                    {!isThankYou && currentSlideIndex === index && (
-                      <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+{/* Left Sidebar */}
+{isSidebarOpen && (
+  <div className="fixed left-2 top-4 h-[calc(100vh-2rem)] w-80 bg-card border border-border rounded-2xl transition-all duration-300 z-50 shadow-sm flex flex-col">
+    {/* Top Bar - Fixed Header Section */}
+    <div className="flex items-center justify-between p-3 border-b border-border bg-card flex-shrink-0 rounded-t-2xl">
+      <div className="flex items-center gap-2">
+        <p className="font-semibold">Pages</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-3 text-sm"
+            onClick={addSlide}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            New
+          </Button>
         </div>
-      )}
-
-      {/* Sidebar Toggle Button (when closed) */}
-      {!isSidebarOpen && (
         <Button
           variant="ghost"
           size="icon"
-          className="fixed left-4 top-20 z-20 h-10 w-10 bg-card border border-border"
-          onClick={() => setIsSidebarOpen(true)}
-          title="Open sidebar"
+          className="h-8 w-8"
+          onClick={() => setIsSidebarOpen(false)}
+          title="Close sidebar"
         >
-          <Film className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </Button>
-      )}
+      </div>
+    </div>
+
+    {/* Slide Thumbnails - Scrollable Content Section */}
+    <div 
+      className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-custom"
+      style={{
+        scrollbarWidth: 'thin',
+        scrollbarColor: 'hsl(var(--foreground) / 0.3) transparent'
+      }}
+    >
+      {getPreviewSlides().map((slide, index, allSlides) => {
+        const isThankYou = index === allSlides.length - 1;
+        const logicalIndex = Math.min(index, Math.max(allSlides.length - 2, 0)); // last real slide
+
+        return (
+          <div
+            key={slide.id}
+            id={`slide-thumbnail-${index}`}
+            className={`relative cursor-pointer rounded-lg border-2 transition-all ${
+              !isThankYou && currentSlideIndex === index
+                ? 'border-primary shadow-lg shadow-primary/20'
+                : 'border-border hover:border-muted-foreground/50'
+            }`}
+            onClick={() => {
+              if (isThankYou) return; // non-editable / non-selectable
+              setCurrentSlideIndex(index);
+              const slideElement = document.getElementById(`main-slide-${index}`);
+              if (slideElement) {
+                slideElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }}
+          >
+            {/* Slide Number Badge */}
+            <div className="absolute bottom-2 left-2 z-10 h-6 w-6 rounded-full bg-card/90 border border-border flex items-center justify-center">
+              <span className="text-xs font-medium text-foreground">
+                {isThankYou ? 'TY' : logicalIndex + 1}
+              </span>
+            </div>
+
+            {/* Slide Thumbnail Preview */}
+            <div className="aspect-video relative overflow-hidden rounded-lg bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+              {slide.imageUrl && (
+                <img
+                  src={slide.imageUrl}
+                  alt={slide.title}
+                  className="absolute inset-0 h-full w-full object-cover opacity-30"
+                />
+              )}
+              
+              <div className="absolute inset-0 p-3 flex flex-col justify-center">
+                <h3 className="text-xs font-semibold text-white line-clamp-2 mb-1">
+                  {isThankYou ? 'Thank you' : slide.title || `Slide ${logicalIndex + 1}`}
+                </h3>
+                {viewMode === 'list' && !isThankYou && (
+                  <p className="text-[10px] text-slate-300/70 line-clamp-2">
+                    {slide.content || ''}
+                  </p>
+                )}
+              </div>
+
+              {/* Selected indicator (only for real slides) */}
+              {!isThankYou && currentSlideIndex === index && (
+                <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none" />
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Custom Scrollbar Styles */}
+    <style jsx>{`
+      .scrollbar-custom::-webkit-scrollbar {
+        width: 6px;
+      }
+      
+      .scrollbar-custom::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 10px;
+      }
+      
+      .scrollbar-custom::-webkit-scrollbar-thumb {
+        background: hsl(var(--foreground) / 0.3);
+        border-radius: 10px;
+        transition: background 0.2s;
+      }
+      
+      .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--foreground) / 0.5);
+      }
+    `}</style>
+  </div>
+)}
+
+{/* Sidebar Toggle Button (when closed) */}
+{!isSidebarOpen && (
+  <Button
+    variant="ghost"
+    size="icon"
+    className="fixed left-4 top-20 z-50 h-10 w-10 bg-card border border-border rounded-xl shadow-sm"
+    onClick={() => setIsSidebarOpen(true)}
+    title="Open sidebar"
+  >
+    <Film className="h-5 w-5" />
+  </Button>
+)}
 
       {/* Main Content Area */}
       <div className={`flex-1 transition-all ${isSidebarOpen ? 'ml-80' : 'ml-0'}`}>
@@ -550,7 +559,7 @@ const Editor = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          className="h-10 w-10 text-foreground hover:bg-muted"
           aria-label="Add slide"
           title="Add slide"
           onClick={addSlide}
@@ -560,7 +569,7 @@ const Editor = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          className="h-10 w-10 text-foreground hover:bg-muted"
           aria-label="Delete slide"
           title="Delete slide"
           onClick={() => deleteSlide()}
@@ -570,7 +579,7 @@ const Editor = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          className="h-10 w-10 text-foreground hover:bg-muted"
           aria-label="Undo delete slide"
           title="Undo delete slide"
           onClick={handleUndoDelete}
@@ -581,7 +590,7 @@ const Editor = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          className="h-10 w-10 text-foreground hover:bg-muted"
           aria-label="Download images"
           title="Download images ZIP"
           onClick={handleDownloadImages}
@@ -591,7 +600,7 @@ const Editor = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          className="h-10 w-10 text-foreground hover:bg-muted"
           aria-label="Start presentation"
           title="Start presentation"
           onClick={() => setIsPresenting(true)}
@@ -601,7 +610,7 @@ const Editor = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          className="h-10 w-10 text-foreground hover:bg-muted"
           aria-label="Export"
           title="Export"
           onClick={() => setIsExportDialogOpen(true)}
@@ -616,7 +625,7 @@ const Editor = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          className="h-10 w-10 text-foreground   hover:bg-muted"
           aria-label="Generate notes"
           title="Generate notes"
           onClick={handleGenerateNotes}
@@ -626,7 +635,7 @@ const Editor = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="h-10 w-10 text-slate-200 hover:bg-muted"
+          className="h-10 w-10 text-foreground hover:bg-muted"
           aria-label="Generate quiz"
           title="Generate quiz"
           onClick={handleGenerateQuiz}
@@ -638,11 +647,11 @@ const Editor = () => {
       
 
       {/* AI Chat Button - Separate below toolbar */}
-      <div className="fixed right-4 top-[calc(60%+160px)] z-30">
+      <div className="fixed right-4 top-[calc(60%+160px)] z-30 ">
         <Button
           variant="default"
           size="lg"
-          className="h-12 px-6 rounded-half bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 flex items-center gap-2"
+          className="h-12 px-6 rounded-2xl border border-border bg-card shadow-xl rounded-half  text-foreground    flex items-center gap-2"
           onClick={() => {
             toast({
               title: 'AI Chat',
@@ -651,7 +660,7 @@ const Editor = () => {
           }}
         >
           <MessageSquare className="h-5 w-5" />
-          <span className="font-medium">AI Chat</span>
+      
         </Button>
         
       </div>

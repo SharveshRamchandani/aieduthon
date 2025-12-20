@@ -185,11 +185,11 @@ const toggleHistorySidebar = () => {
 >
   <div className="pt-10 px-3 space-y-2">
   {!isHistoryCollapsed && (
-    <h2 className="px-2 text-md font-bold uppercase tracking-wide text-muted-foreground mb-4">
+    <h2 className="px-2 text-md font-bold uppercase tracking-wide text-muted-foreground text-center mb-4">
       Your Presentations
     </h2>
   )}
-
+<div className="mx-2 mb-4 h-px bg-foreground" />
   {presentations.map((p) => (
     <button
       key={p.id}

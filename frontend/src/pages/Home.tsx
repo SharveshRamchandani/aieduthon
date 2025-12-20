@@ -48,6 +48,18 @@ const Home = () => {
   { id: "1", title: "Photosynthesis – Class 10" },
   { id: "2", title: "Machine Learning Basics" },
   { id: "3", title: "Business Strategy Pitch" },
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
+  { id: "1", title: "Photosynthesis – Class 10" },
+  { id: "2", title: "Machine Learning Basics" },
+  { id: "3", title: "Business Strategy Pitch" },
 ];
 
 // 🔹 Presentations sidebar state
@@ -181,57 +193,68 @@ const toggleHistorySidebar = () => {
   border border-border
   rounded-2xl
   transition-all duration-300 z-50 shadow-sm
+  flex flex-col
   ${isHistoryCollapsed ? "w-16" : "w-64"}`}
 >
-  <div className="pt-10 px-3 space-y-2">
-  {!isHistoryCollapsed && (
-    <h2 className="px-2 text-md font-bold uppercase tracking-wide text-muted-foreground text-center mb-4">
-      Your Presentations
-    </h2>
-  )}
-<div className="mx-2 mb-4 h-px bg-foreground" />
-  {presentations.map((p) => (
-    <button
-      key={p.id}
-      className={`
-        group w-full flex items-center gap-3
-        rounded-xl px-3 py-2.5
-        text-sm font-medium text-foreground
-        transition-all duration-200
-        hover:bg-accent/70
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-        ${isHistoryCollapsed ? "justify-center" : "justify-start"}
-      `}
-    >
-      {/* Icon */}
-      <span
-        className="
-          flex h-9 w-9 items-center justify-center
-          rounded-lg bg-muted text-muted-foreground
-          group-hover:bg-background group-hover:text-foreground
-          transition-colors
-        "
+  {/* Fixed Header Section */}
+  <div className="pt-10 px-3 flex-shrink-0">
+    {!isHistoryCollapsed && (
+      <h2 className="px-2 text-md font-bold uppercase tracking-wide text-muted-foreground text-center mb-4">
+        Your Presentations
+      </h2>
+    )}
+    <div className="mx-2 mb-4 h-px bg-foreground" />
+  </div>
+
+  {/* Scrollable Content Section */}
+  <div 
+    className="flex-1 overflow-y-auto px-3 space-y-2 pb-20 scrollbar-custom"
+    style={{
+      scrollbarWidth: 'thin',
+      scrollbarColor: 'hsl(var(--foreground) / 0.3) transparent'
+    }}
+  >
+    {presentations.map((p) => (
+      <button
+        key={p.id}
+        className={`
+          group w-full flex items-center gap-3
+          rounded-xl px-3 py-2.5
+          text-sm font-medium text-foreground
+          transition-all duration-200
+          hover:bg-accent/70
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+          ${isHistoryCollapsed ? "justify-center" : "justify-start"}
+        `}
       >
-        📄
-      </span>
-
-      {/* Title */}
-      {!isHistoryCollapsed && (
-        <span className="truncate">
-          {p.title}
+        {/* Icon */}
+        <span
+          className="
+            flex h-9 w-9 items-center justify-center
+            rounded-lg bg-muted text-muted-foreground
+            group-hover:bg-background group-hover:text-foreground
+            transition-colors
+          "
+        >
+          📄
         </span>
-      )}
-    </button>
-  ))}
-</div>
 
+        {/* Title */}
+        {!isHistoryCollapsed && (
+          <span className="truncate">
+            {p.title}
+          </span>
+        )}
+      </button>
+    ))}
+  </div>
 
   {/* Toggle Button */}
   <button
     onClick={toggleHistorySidebar}
     className="fixed bottom-16 z-40 bg-white text-black border border-border rounded-xl p-3 shadow-md"
     style={{
-      left: isHistoryCollapsed ? "20px" : "240px",
+      left: isHistoryCollapsed ? "50px" : "240px",
     }}
   >
     {isHistoryCollapsed ? (
@@ -240,6 +263,28 @@ const toggleHistorySidebar = () => {
       <ChevronLeft className="w-4 h-4" />
     )}
   </button>
+
+  {/* Custom Scrollbar Styles */}
+  <style jsx>{`
+    .scrollbar-custom::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .scrollbar-custom::-webkit-scrollbar-track {
+      background: transparent;
+      border-radius: 10px;
+    }
+    
+    .scrollbar-custom::-webkit-scrollbar-thumb {
+      background: hsl(var(--foreground) / 0.3);
+      border-radius: 10px;
+      transition: background 0.2s;
+    }
+    
+    .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+      background: hsl(var(--foreground) / 0.5);
+    }
+  `}</style>
 </div>
 
 

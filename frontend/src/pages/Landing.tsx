@@ -11,7 +11,10 @@ import {
 } from 'lucide-react';
 import Animation1 from "@/components/Animation";
 import VerticalCarousel from "@/components/Carousel";
+import VerticalCarousel2 from "../components/Carousel2";
 import { Footer7 } from "@/components/Footer";
+
+
 
 
 const Landing = () => {
@@ -20,7 +23,7 @@ const Landing = () => {
   const { user } = useAuth();
   
   const titles = useMemo(
-    () => ["Students", "Teachers & Educators", "Working Professionals", "Startup Teams & Creator", "Researchers & Academics","Corporate Trainers & Coaches"],
+    () => ["Students", "Teachers & Educators", "Working Professionals", "Startup Teams & Creator", "Researchers & Academics","Corporate Teams"],
     []
   );
 
@@ -49,7 +52,8 @@ const [displayedText1, setDisplayedText1] = useState('');
   
   const [showCursorSubtitle, setShowCursorSubtitle] = useState(false);
 
-  const text1 = "Let coco look after your ppt. Just chill!!!";
+  const text1 = "While Coco generates your presentation, just sit back and relax!";
+  
   
 
   useEffect(() => {
@@ -76,10 +80,12 @@ const [displayedText1, setDisplayedText1] = useState('');
 
     // Start the animation
     typeText1();
+    
 
     // Cleanup
     return () => {
       clearTimeout(timeout1);
+      clearTimeout(timeout2);
    
    
     };
@@ -88,18 +94,18 @@ const [displayedText1, setDisplayedText1] = useState('');
   return (
     <div className="w-full min-h-screen overflow-y-hidden">
       <TopBar />
-      <div className="container mx-auto ">
+      <div className="container mx-auto ">  
         <div className="flex gap-8 py-50 lg:py-34 sm:py-32 md:py-32 items-center justify-center flex-col ">
           
           <div className="flex gap-4 flex-col ">
-            <h1 className="text-5xl md:text-7xl sm:text-7xl max-w-6xl tracking-tighter text-center font-regular pt-20 scrollbar-hide">
+            <h1 className="text-5xl md:text-7xl sm:text-7xl max-w-8xl tracking-tighter text-center font-semibold pt-20 scrollbar-hide">
               <span className="text-primary">Personalized Presentation Generator for</span>
-              <span className="relative flex w-full justify-center overflow-hidden text-center md:pb-4 md:pt-1">
+              <span className=" text-8xl relative flex w-full justify-center overflow-hidden text-center md:pb-4 md:pt-6">
                 &nbsp;
                 {titles.map((title, index) => (
                   <motion.span
                     key={index}
-                    className="absolute font-semibold"
+                    className="absolute font-bold"
                     initial={{ opacity: 0, y: -100 }}
                     transition={{ type: "spring", stiffness: 50 }}
                     animate={
@@ -123,7 +129,7 @@ const [displayedText1, setDisplayedText1] = useState('');
               </div>
             </h1>
 
-          <div className="flex gap-4 flex-col items-center pt-16 pb-24">
+          <div className="flex gap-4 flex-col items-center pt-16 pb-16">
             <button className="btn" onClick={handleGetStarted}>
               <svg
                 className="sparkle"
@@ -141,7 +147,7 @@ const [displayedText1, setDisplayedText1] = useState('');
                 <path d="M17.25 13.7412L20.377 12.5825" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span className="text">Get Started</span>
-              <MoveRight className="w-4 h-4" />
+              <MoveRight className="w-6 h-6 " />
             </button>
           </div>
           </div>
@@ -180,27 +186,27 @@ const [displayedText1, setDisplayedText1] = useState('');
             {/* Row 2: Left card + text on the right */}
             
             <div className="flex justify-end pt-10 ">
-              <div className="w-full lg:w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
+              <div className="flex justify-end">
+              <div className="w-full lg:w-[700px] rounded-3xl p-2 border  hover:shadow-lg transition-all group overflow-hidden relative min-h-[400px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
                 <div className="relative z-10">
                   
                 </div>
 
-                  <div className="absolute left-[-40px] bottom-[-40px] w-3/4 h-3/4 rounded-tl-3xl border-t border-r transition-transform group-hover:scale-105 group-hover:-translate-x-2 group-hover:-translate-y-2 bg-white/20 border-white/30 dark:bg-gray-100 dark:border-gray-200">
-                  <div className="p-6">
-                    <div className="w-full h-8 rounded mb-4 bg-white/40 dark:bg-gray-300" />
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="h-24 rounded bg-white/40 dark:bg-gray-200" />
-                      <div className="h-24 rounded bg-white/40 dark:bg-gray-200" />
+                
+                  <div className="p-4 h-full w-full flex items-center justify-center">
+                    <div className="w-full h-full" style={{ height: '100%', minHeight: '350px' }}>
+                      <VerticalCarousel2 />
                     </div>
-                  </div>
+                  
                 </div>
               </div>
+            </div>
             </div>
 
            <div className="flex items-start justify-end pt-10">
               <div className="w-full lg:max-w-xl space-y-4 ">
               <h2 className="text-6xl  font-bold mb-4 leading-tight text-right">
-                   Simply define your topic, and our ai generates attractive, editable tailored presentations.
+                   Define your topic. Get editable, stunning slides.
                                      </h2>
                 
                 
@@ -211,20 +217,31 @@ const [displayedText1, setDisplayedText1] = useState('');
           </div>
 
 
-  {/* <div className="min-h-screen flex items-center justify-center ">
-  <div className="w-[1000px] rounded-3xl p-8 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
-    <div className="relative z-10"></div>
-    <h1 className="text-5xl font-bold mb-8 leading-tight text-center">
-       Extra content
-      </h1>
-    <div>
-      <div className="p-6"></div>
+ <div className="min-h-screen flex items-center justify-center">
+  <div className="w-[1200px] rounded-3xl p-8 border hover:shadow-lg transition-all overflow-hidden min-h-[600px] bg-black text-white border-gray-900 dark:bg-white dark:text-black dark:border-gray-200">
+    
+    {/* Center Gradient Div */}
+    <div
+      className="w-full h-[540px] rounded-2xl
+                 flex items-center justify-center
+                 bg-[linear-gradient(135deg,#7EC8E3_0%,#9BB8FF_25%,#B9B6FF_50%,#D9C8FF_75%,#E6C7B8_100%)]"
+    >
+      <h2 className="text-5xl md:text-8xl max-w-3xl font-bold leading-tight text-center">
+        So, what do you want to create today?
+      </h2>
     </div>
+
   </div>
-</div> */}
+</div>
+
+
+
+  
+  
+  
    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-[1400px] mx-auto">
   <div className="pt-10">
-<h2 className="text-4xl md:text-7xl font-bold mb-4 leading-tight text-left ">
+  <h2 className="text-4xl md:text-7xl font-bold mb-4 leading-tight text-left ">
                     <span className="text-accent-brown block">
                       {displayedText1}
                       {showCursor1 && <span className="animate-pulse">|</span>}
@@ -235,22 +252,16 @@ const [displayedText1, setDisplayedText1] = useState('');
                 </div>
 
                 
-    <div className="relative z-10 top-20 right-20">
+    <div className="relative z-10 top-20 right-30">
 <div className=" items-center justify-center  ">
       <Animation1 />
     </div>
-    </div>
-  </div>
-  
-     
     
-   
-  <Footer7 />
-
-
-                 
-          </div>
-          
+    </div>
+    
+  </div>
+   </div>
+          <Footer7 />
         </div> 
         
         
@@ -282,8 +293,7 @@ const [displayedText1, setDisplayedText1] = useState('');
         }
 
         .btn:hover {
-          
-          box-shadow: inset 0px 1px 0px 0px rgba(255, 255, 255, 0),
+          font-weight:800,
           inset 0px -4px 0px 0px rgba(0, 0, 0, 0.2),
           0px 0px 0px 4px rgba(255, 255, 255, 0.2),
           0px 0px 180px 0px #000000;
@@ -292,11 +302,16 @@ const [displayedText1, setDisplayedText1] = useState('');
 
         .btn:hover .text {
           color: white;
+          font-size:20px,
+          transition: 4ms ease-in-out;
         }
 
         .btn:hover .sparkle {
           fill: white;
           transform: scale(1.2);
+        }
+        .btn:hover .moveRight{
+        background:white,
         }
       `}</style>
     </div>

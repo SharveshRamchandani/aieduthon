@@ -1,11 +1,11 @@
 import React from "react";
 import styled from "styled-components";
-import { slide1,slide2,slide3,slide4,slide5,slide6,slide7 } from "@/assets";
+import { slide8,slide9,slide10 } from "@/assets";
 const slides = [
-  slide1,slide2,slide3,slide4,slide5,slide6,slide7
+ slide8,slide9,slide10 
 ];
 
-const VerticalCarousel = () => {
+const VerticalCarousel2 = () => {
   const quantity = slides.length;
   
   return (
@@ -43,7 +43,7 @@ const StyledWrapper = styled.div`
     position: relative;
     border-radius:10px;
     /* 👇 control spacing here */
-    --gap: 950px;
+    --gap: 200px;
   }
 
   .list {
@@ -60,9 +60,9 @@ const StyledWrapper = styled.div`
     position: absolute;
     top: 100%;
 
-    animation: verticalRun 70s linear infinite;
+    animation: verticalRun 40s linear infinite;
     animation-delay: calc(
-      (70s / var(--quantity)) * (var(--position) - 1) - 70s
+      (40s / var(--quantity)) * (var(--position) - 1) - 40s
     );
   }
 
@@ -94,4 +94,4 @@ const StyledWrapper = styled.div`
 
 
 
-export default VerticalCarousel;
+export default VerticalCarousel2;

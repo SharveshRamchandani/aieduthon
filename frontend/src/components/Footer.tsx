@@ -81,7 +81,7 @@ export const Footer7 = ({
   legalLinks = defaultLegalLinks,
 }: Footer7Props) => {
   return (
-    <footer className="w-full mt-20 pt-10  bg-background border-t border-border">
+    <footer className="w-full  pt-10  bg-background border-t border-border">
       <div className="container mx-auto px-4">
         <div className="flex w-full flex-col justify-between  lg:flex-row lg:items-start lg:text-left">
           <div className="flex w-full flex-col justify-between gap-6 lg:items-start">

@@ -94,9 +94,9 @@ const StyledWrapper = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 80px;               
+  gap: 60px;               
   width: 60vh;
-  height: 60vh ;
+  height: 40vh ;
 }
 
   .macbook {

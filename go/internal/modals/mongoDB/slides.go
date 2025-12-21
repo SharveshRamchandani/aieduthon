@@ -58,14 +58,14 @@ type Slide struct {
 	Bullets           [][]string             `bson:"bullets" json:"bullets"` // Array of arrays
 	Examples          [][]string             `bson:"examples" json:"examples"`
 	KeyPoints         [][]string             `bson:"key_points" json:"key_points"`
-	ImagePlaceholders [][]string             `bson:"image_placeholders" json:"image_placeholders"`
-	ImageMarkers      []ImageMarker          `bson:"image_markers" json:"image_markers"`
-	TemplatePath      string                 `bson:"template_path,omitempty" json:"template_path,omitempty"`
-	GeneratedNotes    []string               `bson:"generated_notes" json:"generated_notes"`
-	SpeakerNotes      []SpeakerNote          `bson:"speaker_notes" json:"speaker_notes"`
-	Style             string                 `bson:"style" json:"style"`
-	MediaRefs         []string               `bson:"media_refs" json:"media_refs"`
-	DiagramRefs       []string               `bson:"diagram_refs" json:"diagram_refs"`
+	ImagePlaceholders [][]map[string]interface{} `bson:"image_placeholders" json:"image_placeholders"`
+	ImageMarkers      []ImageMarker              `bson:"image_markers" json:"image_markers"`
+	TemplatePath      string                     `bson:"template_path,omitempty" json:"template_path,omitempty"`
+	GeneratedNotes    []string                   `bson:"generated_notes" json:"generated_notes"`
+	SpeakerNotes      []SpeakerNote              `bson:"speaker_notes" json:"speaker_notes"`
+	Style             string                     `bson:"style" json:"style"`
+	MediaRefs         [][]string                 `bson:"media_refs" json:"media_refs"`
+	DiagramRefs       [][]string                 `bson:"diagram_refs" json:"diagram_refs"`
 	QuizRefs          []string               `bson:"quiz_refs" json:"quiz_refs"`
 	LocalizedVersions []string               `bson:"localized_versions" json:"localized_versions"`
 	Categories        SlideCategories        `bson:"categories" json:"categories"`

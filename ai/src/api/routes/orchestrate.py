@@ -59,6 +59,7 @@ def orchestrate(body: OrchestrateRequest):
 		audience_level=body.audience_level,
 		presentation_style=body.presentation_style,
 		skip_db=True,  # Go will handle DB storage
+		slide_deck=slides_result.get("slide_deck")
 	)
 	if not notes_result.get("success"):
 		raise HTTPException(status_code=500, detail=notes_result.get("error", "Speaker notes generation failed"))
@@ -72,6 +73,7 @@ def orchestrate(body: OrchestrateRequest):
 		difficulty=None,
 		num_questions=body.quiz_questions,
 		skip_db=True,  # Go will handle DB storage
+		slide_deck=slides_result.get("slide_deck")
 	)
 	if not quiz_result.get("success"):
 		raise HTTPException(status_code=500, detail=quiz_result.get("error", "Quiz generation failed"))
@@ -94,7 +96,8 @@ def orchestrate(body: OrchestrateRequest):
 				context=media_context,
 				generate_images=body.generate_images,
 				generate_diagrams=body.generate_diagrams,
-				skip_db=True  # Go will handle DB storage
+				skip_db=True,  # Go will handle DB storage
+				slide_deck=slide_deck
 			)
 		except Exception as e:
 			# Media generation is optional, don't fail the entire request

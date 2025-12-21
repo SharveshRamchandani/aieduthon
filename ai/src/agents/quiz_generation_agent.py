@@ -49,27 +49,35 @@ class QuizGenerationAgent:
 		self.text_agent = TextGenerationAgent()
 		
 	def generate_quiz(self, 
-				 deck_id: str, 
+				 deck_id: Optional[str], 
 				 user_id: str,
 				 quiz_type: str = "comprehensive",
 				 difficulty: Optional[str] = None,
 				 num_questions: Optional[int] = None,
-				 skip_db: bool = False) -> Dict[str, Any]:
+				 skip_db: bool = False,
+				 slide_deck: Optional[Dict] = None) -> Dict[str, Any]:
 		"""
 		Generate quiz from slide deck
 		
 		Args:
-			deck_id: ID of the slide deck
+			deck_id: ID of the slide deck (optional if slide_deck provided)
 			user_id: User identifier
 			quiz_type: "comprehensive", "per_topic", "final_only"
 			difficulty: Override difficulty level
+			skip_db: Whether to skip database operations
+			slide_deck: Optional slide deck object (dict) to use instead of fetching from DB
 			
 		Returns:
 			Dict with generated quiz and metadata
 		"""
 		try:
 			# Get slide deck
-			deck = self._get_slide_deck(deck_id)
+			deck = None
+			if slide_deck:
+				deck = slide_deck
+			elif deck_id:
+				deck = self._get_slide_deck(deck_id)
+			
 			if not deck:
 				return {"success": False, "error": "Slide deck not found"}
 			

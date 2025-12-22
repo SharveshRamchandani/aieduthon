@@ -130,9 +130,9 @@ const [displayedText1, setDisplayedText1] = useState('');
             </h1>
 
           <div className="flex gap-4 flex-col items-center pt-16 pb-16">
-            <button className="btn" onClick={handleGetStarted}>
+            <button className="btn bg-foreground" onClick={handleGetStarted}>
               <svg
-                className="sparkle"
+                className="sparkle color-background"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -146,8 +146,8 @@ const [displayedText1, setDisplayedText1] = useState('');
                 <path d="M3.62305 13.9087L6.75 12.75" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M17.25 13.7412L20.377 12.5825" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="text">Get Started</span>
-              <MoveRight className="w-6 h-6 " />
+              <span className=" text text-background">Get Started</span>
+              <MoveRight className="w-6 h-6 text-background" />
             </button>
           </div>
           </div>
@@ -276,7 +276,6 @@ const [displayedText1, setDisplayedText1] = useState('');
           justify-content: center;
           align-items: center;
           gap: 12px;
-          background: #1C1A1C;
           cursor: pointer;
           transition: all 450ms ease-in-out;
         }
@@ -288,7 +287,6 @@ const [displayedText1, setDisplayedText1] = useState('');
 
         .text {
           font-weight: 600;
-          color: #AAAAAA;
           font-size: medium;
         }
 
@@ -301,14 +299,14 @@ const [displayedText1, setDisplayedText1] = useState('');
         }
 
         .btn:hover .text {
-          color: white;
-          font-size:20px,
+          
+          font-size:40px,
           transition: 4ms ease-in-out;
         }
 
         .btn:hover .sparkle {
-          fill: white;
-          transform: scale(1.2);
+          
+          transform: scale(1.4);
         }
         .btn:hover .moveRight{
         background:white,

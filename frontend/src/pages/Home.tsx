@@ -192,7 +192,7 @@ const toggleHistorySidebar = () => {
   className={`fixed left-2 top-4 h-[calc(100vh-2rem)] bg-card
   border border-border
   rounded-2xl
-  transition-all duration-300 z-50 shadow-sm
+  transition-all duration-300 z-50 
   flex flex-col
   ${isHistoryCollapsed ? "w-16" : "w-64"}`}
 >
@@ -265,7 +265,7 @@ const toggleHistorySidebar = () => {
   </button>
 
   {/* Custom Scrollbar Styles */}
-  <style jsx>{`
+  <style >{`
     .scrollbar-custom::-webkit-scrollbar {
       width: 6px;
     }
@@ -484,7 +484,7 @@ const toggleHistorySidebar = () => {
     </div>
 
     {/* Custom Scrollbar Styles */}
-    <style jsx>{`
+    <style >{`
       .scrollbar-custom::-webkit-scrollbar {
         width: 6px;
       }

@@ -50,18 +50,22 @@ class MediaIntegrationAgent:
         return self.image_agent
     
     def generate_media_for_deck(self,
-                                deck_id: str,
+                                deck_id: Optional[str],
                                 context: Optional[Dict] = None,
                                 generate_images: bool = True,
-                                generate_diagrams: bool = True) -> Dict[str, Any]:
+                                generate_diagrams: bool = True,
+                                skip_db: bool = False,
+                                slide_deck: Optional[Dict] = None) -> Dict[str, Any]:
         """
         Generate media (images and diagrams) for all slides in a deck
         
         Args:
-            deck_id: ID of the slide deck
+            deck_id: ID of the slide deck (optional if slide_deck provided)
             context: Additional context (grade_level, subject, etc.)
             generate_images: Whether to generate images
             generate_diagrams: Whether to generate diagrams
+            skip_db: Whether to skip database operations
+            slide_deck: Optional slide deck object (dict) to use instead of fetching from DB
         
         Returns:
             Dict with generated media references
@@ -72,8 +76,13 @@ class MediaIntegrationAgent:
             session_id = context.get("text_session_id") or context.get("session_id")
             
             # Get slide deck
-            from bson.objectid import ObjectId
-            deck = self.slides_collection.find_one({"_id": ObjectId(deck_id)})
+            deck = None
+            if slide_deck:
+                deck = slide_deck
+            elif deck_id:
+                from bson.objectid import ObjectId
+                deck = self.slides_collection.find_one({"_id": ObjectId(deck_id)})
+            
             if not deck:
                 return {"success": False, "error": "Slide deck not found"}
             
@@ -252,18 +261,19 @@ class MediaIntegrationAgent:
                 diagram_refs.append(slide_diagrams)
                 media_metadata.append(slide_media_details)
             
-            # Update deck with media references
-            self.slides_collection.update_one(
-                {"_id": ObjectId(deck_id)},
-                {
-                    "$set": {
-                        "media_refs": media_refs,
-                        "diagram_refs": diagram_refs,
-                        "media_metadata": media_metadata,
-                        "media_generated_at": datetime.utcnow()
+            # Update deck with media references (skip if skip_db)
+            if not skip_db:
+                self.slides_collection.update_one(
+                    {"_id": ObjectId(deck_id)},
+                    {
+                        "$set": {
+                            "media_refs": media_refs,
+                            "diagram_refs": diagram_refs,
+                            "media_metadata": media_metadata,
+                            "media_generated_at": datetime.utcnow()
+                        }
                     }
-                }
-            )
+                )
             
             return {
                 "success": True,

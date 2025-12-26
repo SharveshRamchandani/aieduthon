@@ -2,11 +2,11 @@
  * API Service for Multimodal AI Pipeline
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:6001/api';
 
 export interface GenerateTextRequest {
   prompt: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   max_length?: number;
   temperature?: number;
   use_cache?: boolean;
@@ -38,7 +38,7 @@ export interface GenerateImageResponse {
 export interface GenerateDiagramRequest {
   diagram_type: string;
   description: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   format?: string;
   style?: string;
 }
@@ -54,7 +54,7 @@ export interface OrchestrateRequest {
   prompt: string;
   userId: string;
   locale?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   quiz_type?: string;
   quiz_questions?: number;
   audience_level?: string;
@@ -81,7 +81,7 @@ export interface SlideDeck {
   key_points?: string[][];
   media_refs?: string[][];
   diagram_refs?: string[][];
-  speaker_notes?: any[];
+  speaker_notes?: unknown[];
   metadata?: {
     total_slides: number;
     estimated_duration: number;
@@ -95,6 +95,7 @@ export async function generateText(request: GenerateTextRequest): Promise<Genera
   const response = await fetch(`${API_BASE_URL}/generate-text`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(request),
   });
 
@@ -111,6 +112,7 @@ export async function generateImage(request: GenerateImageRequest): Promise<Gene
   const response = await fetch(`${API_BASE_URL}/generate-image`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(request),
   });
 
@@ -127,6 +129,7 @@ export async function generateDiagram(request: GenerateDiagramRequest): Promise<
   const response = await fetch(`${API_BASE_URL}/generate-diagram`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(request),
   });
 
@@ -143,6 +146,7 @@ export async function orchestrate(request: OrchestrateRequest): Promise<Orchestr
   const response = await fetch(`${API_BASE_URL}/orchestrate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({
       ...request,
       locale: request.locale || 'en',
@@ -167,6 +171,7 @@ export async function getDeck(deckId: string): Promise<SlideDeck> {
   const response = await fetch(`${API_BASE_URL}/slides/${deckId}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -186,6 +191,7 @@ export async function generateMediaForDeck(
   const response = await fetch(`${API_BASE_URL}/generate-media/${deckId}?generate_images=${generateImages}&generate_diagrams=${generateDiagrams}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -200,6 +206,7 @@ export async function generateMediaForDeck(
 export async function downloadDeckImages(deckId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/slides/${deckId}/images-zip`, {
     method: 'GET',
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -231,6 +238,7 @@ export async function exportDeck(
   const response = await fetch(`${API_BASE_URL}/slides/${deckId}/export`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ 
       output_dir: outputDir,
       format: format,
@@ -272,10 +280,11 @@ export async function generateSpeakerNotes(
   userId: string,
   audienceLevel?: string,
   presentationStyle?: string
-): Promise<{ success: boolean; speaker_notes: any[] }> {
+): Promise<{ success: boolean; speaker_notes: unknown[] }> {
   const response = await fetch(`${API_BASE_URL}/slides/${deckId}/speaker-notes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({
       userId,
       audience_level: audienceLevel,
@@ -321,6 +330,7 @@ export async function generateQuiz(
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({
       userId,
       quiz_type: quizType || 'comprehensive',

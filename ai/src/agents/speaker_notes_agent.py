@@ -37,25 +37,34 @@ class SpeakerNotesAgent:
 		self.text_agent = TextGenerationAgent()
 		
 	def generate_speaker_notes(self, 
-						   deck_id: str, 
+						   deck_id: Optional[str], 
 						   user_id: str,
 						   audience_level: Optional[str] = None,
-						   presentation_style: str = "educational") -> Dict[str, Any]:
+						   presentation_style: str = "educational",
+						   skip_db: bool = False,
+						   slide_deck: Optional[Dict] = None) -> Dict[str, Any]:
 		"""
 		Generate speaker notes for slide deck
 		
 		Args:
-			deck_id: ID of the slide deck
+			deck_id: ID of the slide deck (optional if slide_deck provided)
 			user_id: User identifier
 			audience_level: "beginner", "intermediate", "advanced"
 			presentation_style: "educational", "persuasive", "informative"
+			skip_db: Whether to skip database operations
+			slide_deck: Optional slide deck object (dict) to use instead of fetching from DB
 			
 		Returns:
 			Dict with generated speaker notes and metadata
 		"""
 		try:
 			# Get slide deck
-			deck = self._get_slide_deck(deck_id)
+			deck = None
+			if slide_deck:
+				deck = slide_deck
+			elif deck_id:
+				deck = self._get_slide_deck(deck_id)
+			
 			if not deck:
 				return {"success": False, "error": "Slide deck not found"}
 			
@@ -68,15 +77,17 @@ class SpeakerNotesAgent:
 				note = self._generate_slide_notes(section, bullets, context, i)
 				speaker_notes.append(note)
 			
-			# Store speaker notes
-			self._store_speaker_notes(deck_id, speaker_notes, user_id)
+			# Store speaker notes (skip if skip_db)
+			if not skip_db:
+				self._store_speaker_notes(deck_id, speaker_notes, user_id)
 			
-			# Emit analytics event
-			self._emit_analytics_event(user_id, deck_id, "speaker_notes_generated", {
-				"total_slides": len(speaker_notes),
-				"audience_level": context["audience_level"],
-				"presentation_style": presentation_style
-			})
+			# Emit analytics event (skip if skip_db)
+			if not skip_db:
+				self._emit_analytics_event(user_id, deck_id, "speaker_notes_generated", {
+					"total_slides": len(speaker_notes),
+					"audience_level": context["audience_level"],
+					"presentation_style": presentation_style
+				})
 			
 			return {
 				"success": True,

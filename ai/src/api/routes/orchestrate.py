@@ -45,6 +45,7 @@ def orchestrate(body: OrchestrateRequest):
 		user_id=body.userId,
 		locale=body.locale,
 		context=merged_context,
+		skip_db=True,  # Go will handle DB storage
 	)
 	if not slides_result.get("success"):
 		raise HTTPException(status_code=500, detail=slides_result.get("error", "Slide generation failed"))
@@ -57,6 +58,8 @@ def orchestrate(body: OrchestrateRequest):
 		user_id=body.userId,
 		audience_level=body.audience_level,
 		presentation_style=body.presentation_style,
+		skip_db=True,  # Go will handle DB storage
+		slide_deck=slides_result.get("slide_deck")
 	)
 	if not notes_result.get("success"):
 		raise HTTPException(status_code=500, detail=notes_result.get("error", "Speaker notes generation failed"))
@@ -69,6 +72,8 @@ def orchestrate(body: OrchestrateRequest):
 		quiz_type=body.quiz_type,
 		difficulty=None,
 		num_questions=body.quiz_questions,
+		skip_db=True,  # Go will handle DB storage
+		slide_deck=slides_result.get("slide_deck")
 	)
 	if not quiz_result.get("success"):
 		raise HTTPException(status_code=500, detail=quiz_result.get("error", "Quiz generation failed"))
@@ -90,7 +95,9 @@ def orchestrate(body: OrchestrateRequest):
 				deck_id=deck_id,
 				context=media_context,
 				generate_images=body.generate_images,
-				generate_diagrams=body.generate_diagrams
+				generate_diagrams=body.generate_diagrams,
+				skip_db=True,  # Go will handle DB storage
+				slide_deck=slide_deck
 			)
 		except Exception as e:
 			# Media generation is optional, don't fail the entire request
@@ -113,7 +120,8 @@ def orchestrate(body: OrchestrateRequest):
 		ppt_filename = None
 		ppt_checks = {"json_tokens": ["export_failed"], "bullet_overflow": []}
 
-	return {
+	# Include data for Go to store in database
+	result = {
 		"deckId": deck_id,
 		"promptId": slides_result.get("prompt_id"),
 		"quizIds": quiz_result.get("quiz_ids", []),
@@ -123,5 +131,21 @@ def orchestrate(body: OrchestrateRequest):
 		"pptValidation": ppt_checks,
 		"message": "Complete multimodal presentation generated successfully"
 	}
+	
+	# Add data structures for Go to store
+	if "prompt_data" in slides_result:
+		result["prompt_data"] = slides_result["prompt_data"]
+	if "deck_data" in slides_result:
+		result["deck_data"] = slides_result["deck_data"]
+	if "quiz_data" in quiz_result:
+		result["quiz_data"] = quiz_result["quiz_data"]
+	if "speaker_notes" in notes_result:
+		result["speaker_notes_data"] = notes_result["speaker_notes"]
+	if media_result and media_result.get("success"):
+		result["media_refs"] = media_result.get("media_refs", [])
+		result["diagram_refs"] = media_result.get("diagram_refs", [])
+		result["media_metadata"] = media_result.get("media_metadata", [])
+	
+	return result
 
 

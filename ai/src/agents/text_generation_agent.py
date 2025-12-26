@@ -1342,6 +1342,8 @@ Existing slide JSON:
                     result["image_markers"] = aggregated_markers
             except Exception as e:
                 logger.warning(f"Failed to parse Gemini expanded slide JSON: {e}")
+                result["success"] = False
+                result["error"] = f"Failed to parse expanded JSON: {str(e)}"
         
         return result
     
@@ -1471,7 +1473,9 @@ Existing slide JSON:
                     result["image_markers"] = aggregated_markers
             except Exception as e:
                 logger.warning(f"Failed to parse expanded slide JSON: {e}")
-                # On failure, return the original text so caller can fall back
+                # On failure, return failure so caller can fall back to previous result
+                result["success"] = False
+                result["error"] = f"Failed to parse expanded JSON: {str(e)}"
         
         return result
     
